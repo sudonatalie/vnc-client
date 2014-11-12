@@ -18,6 +18,13 @@ connect host port = withSocketsDo $ do
     version <- recv sock 12
     putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack version
 
+    send sock $ B8.pack "test"
+    temp <- recv sock 1
+    putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack temp
+    
+    temp <- recv sock 4
+    putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack temp
+
     -- Close socket
     sClose sock
 
