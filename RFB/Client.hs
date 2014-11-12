@@ -18,12 +18,19 @@ connect host port = withSocketsDo $ do
     version <- recv sock 12
     putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack version
 
-    send sock $ B8.pack "test"
-    temp <- recv sock 1
-    putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack temp
+    -- Send back agreed version. (Same as server version, for now)
+    -- // same error with sending String :: test
+    send sock version
+
+    -- Receive number of security type, which is 1 byte. 
+    numberOfSecurityTypes <- recv sock 1
+    putStrLn $ "The number of security types is: " ++ B8.unpack numberOfSecurityTypes
     
-    temp <- recv sock 4
-    putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack temp
+    -- Change the value type to int
+    -- // cannot pass compilation
+    -- numberInt <- read $ B8.unpack numberOfSecurityTypes
+    -- securityTypes <- recv sock numberInt
+    -- putStrLn $ "Here are the security types: " ++ B8.unpack securityTypes
 
     -- Close socket
     sClose sock
