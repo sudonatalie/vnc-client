@@ -3,6 +3,7 @@ module RFB.Client where
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
 import qualified Data.ByteString.Char8 as B8
+import Data.Char (ord)
 
 connect :: String -> Int -> IO()
 connect host port = withSocketsDo $ do
@@ -14,24 +15,27 @@ connect host port = withSocketsDo $ do
     Network.Socket.connect sock (addrAddress serverAddr)
 
     -- Check for VNC server
-    send sock $ B8.pack "Anyone there?"
-    version <- recv sock 12
-    putStrLn $ "Hi, I'm a VNC server running " ++ B8.unpack version
+    send sock B8.empty
+    msg <- recv sock 12
+    -- TODO Verify version format
+    putStr $ "Server Protocol Version: " ++ B8.unpack msg
 
-    -- Send back agreed version. (Same as server version, for now)
-    -- // same error with sending String :: test
-    send sock version
+    -- TODO Actually compare version numbers before blindy choosing
+    let version = "RFB 003.007\n"
+    putStr $ "Requsted Protocol Version: " ++ version
+    send sock $ B8.pack version
 
-    -- Receive number of security type, which is 1 byte. 
-    numberOfSecurityTypes <- recv sock 1
-    putStrLn $ "The number of security types is: " ++ B8.unpack numberOfSecurityTypes
-    
-    -- Change the value type to int
-    -- // cannot pass compilation
-    -- numberInt <- read $ B8.unpack numberOfSecurityTypes
-    -- securityTypes <- recv sock numberInt
-    -- putStrLn $ "Here are the security types: " ++ B8.unpack securityTypes
+    -- Receive number of security types
+    msg <- recv sock 1
+    let numberOfSecurityTypes = head (bytestringToInts msg)
+
+    -- Receive security types
+    msg <- recv sock numberOfSecurityTypes
+    let securityTypes = bytestringToInts msg
+    putStrLn $ "Server Security Types: " ++ show securityTypes
 
     -- Close socket
     sClose sock
 
+bytestringToInts :: B8.ByteString -> [Int]
+bytestringToInts b = map ord (B8.unpack b)
