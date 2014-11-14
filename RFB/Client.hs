@@ -3,7 +3,7 @@ module RFB.Client where
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
 import qualified Data.ByteString.Char8 as B8
-import Data.Char (ord)
+import Data.Char (ord, chr)
 
 connect :: String -> Int -> IO()
 connect host port = withSocketsDo $ do
@@ -34,8 +34,20 @@ connect host port = withSocketsDo $ do
     let securityTypes = bytestringToInts msg
     putStrLn $ "Server Security Types: " ++ show securityTypes
 
+    -- TODO Actually check security types before blindy choosing
+    send sock (intsToBytestring [2])
+    msg <- recv sock 16
+    let challenge = bytestringToInts msg
+    putStrLn $ "Challenge: " ++ show challenge
+    putStrLn $ "Enter Password: "
+    password <- getLine
+
     -- Close socket
     sClose sock
 
 bytestringToInts :: B8.ByteString -> [Int]
 bytestringToInts b = map ord (B8.unpack b)
+
+intsToBytestring :: [Int] -> B8.ByteString
+intsToBytestring b = B8.pack (map chr b)
+
