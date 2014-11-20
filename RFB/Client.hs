@@ -35,12 +35,10 @@ connect host port = withSocketsDo $ do
     putStrLn $ "Server Security Types: " ++ show securityTypes
 
     -- TODO Actually check security types before blindy choosing
-    send sock (intsToBytestring [2])
-    msg <- recv sock 16
-    let challenge = bytestringToInts msg
-    putStrLn $ "Challenge: " ++ show challenge
-    putStrLn $ "Enter Password: "
-    password <- getLine
+    send sock (intsToBytestring [1])
+
+    -- I don't know why SecurityResult isn't being sent
+    -- msg <- recv sock 1
 
     -- Close socket
     sClose sock
