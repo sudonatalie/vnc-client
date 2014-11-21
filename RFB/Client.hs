@@ -82,6 +82,8 @@ connect host port = withSocketsDo $ do
     let numberofRectangles = 256 * serverInit !! 2 + serverInit !! 3
     putStrLn $ "numberofRectangles: " ++ show numberofRectangles
 
+    hold <- getLine
+
     -- Close socket
     sClose sock
 
