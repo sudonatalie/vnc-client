@@ -40,6 +40,39 @@ connect host port = withSocketsDo $ do
     -- I don't know why SecurityResult isn't being sent
     -- msg <- recv sock 1
 
+    -- Allow shared desktop
+    send sock (intsToBytestring [1])
+
+    -- Get ServerInit message
+    msg <- recv sock 20
+    let serverInit = bytestringToInts msg
+    let framebufferWidth = 256 * serverInit !! 0 + serverInit !! 1
+    let framebufferHeight = 256 * serverInit !! 2 + serverInit !! 3
+    let bitsPerPixel = serverInit !! 4
+    let depth = serverInit !! 5
+    let bigEndianFlag = serverInit !! 6
+    let trueColourFlag = serverInit !! 7
+    let redMax = 256 * serverInit !! 8 + serverInit !! 9
+    let blueMax = 256 * serverInit !! 10 + serverInit !! 11
+    let greenMax = 256 * serverInit !! 12 + serverInit !! 13
+    let redShift = serverInit !! 14
+    let greenShift = serverInit !! 15
+    let blueShift = serverInit !! 16
+    -- Last 3 bytes for padding
+    putStrLn $ "serverInit: " ++ show serverInit
+    putStrLn $ "framebufferWidth: " ++ show framebufferWidth
+    putStrLn $ "framebufferHeight: " ++ show framebufferHeight
+    putStrLn $ "bitsPerPixel: " ++ show bitsPerPixel
+    putStrLn $ "depth: " ++ show depth
+    putStrLn $ "bigEndianFlag: " ++ show bigEndianFlag
+    putStrLn $ "trueColourFlag: " ++ show trueColourFlag
+    putStrLn $ "redMax: " ++ show redMax
+    putStrLn $ "blueMax: " ++ show blueMax
+    putStrLn $ "greenMax: " ++ show greenMax
+    putStrLn $ "redShift: " ++ show redShift
+    putStrLn $ "greenShift: " ++ show greenShift
+    putStrLn $ "blueShift: " ++ show blueShift
+
     -- Close socket
     sClose sock
 
