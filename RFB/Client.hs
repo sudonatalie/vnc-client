@@ -16,9 +16,9 @@ connect host port = withSocketsDo $ do
 
     -- Check for VNC server
     send sock B8.empty
-    msg <- recv sock 12
+    msg <- recvString sock 12
     -- TODO Verify version format
-    putStr $ "Server Protocol Version: " ++ B8.unpack msg
+    putStr $ "Server Protocol Version: " ++ msg
 
     -- TODO Actually compare version numbers before blindy choosing
     let version = "RFB 003.007\n"
@@ -26,13 +26,12 @@ connect host port = withSocketsDo $ do
     send sock $ B8.pack version
 
     -- Receive number of security types
-    msg <- recv sock 1
-    let numberOfSecurityTypes = head (bytestringToInts msg)
+    msg <- recvInts sock 1
+    let numberOfSecurityTypes = head msg
 
     -- Receive security types
-    msg <- recv sock numberOfSecurityTypes
-    let securityTypes = bytestringToInts msg
-    putStrLn $ "Server Security Types: " ++ show securityTypes
+    securityTypes <- recvString sock numberOfSecurityTypes
+    putStrLn $ "Server Security Types: " ++ securityTypes
 
     -- TODO Actually check security types before blindy choosing
     send sock (intsToBytestring [1])
@@ -44,8 +43,7 @@ connect host port = withSocketsDo $ do
     send sock (intsToBytestring [1])
 
     -- Get ServerInit message
-    msg <- recv sock 20
-    let serverInit = bytestringToInts msg
+    serverInit <- recvInts sock 20
     let framebufferWidth = 256 * serverInit !! 0 + serverInit !! 1
     let framebufferHeight = 256 * serverInit !! 2 + serverInit !! 3
     let bitsPerPixel = serverInit !! 4
@@ -75,8 +73,7 @@ connect host port = withSocketsDo $ do
 
     let framebufferUpdateRequest = [3, 0, 0, 0, 0, 0, framebufferWidth `quot` 256, framebufferWidth `rem` 256, framebufferHeight `quot` 256, framebufferHeight `rem` 256]
     send sock (intsToBytestring framebufferUpdateRequest)
-    msg <- recv sock 4
-    let framebufferUpdate = bytestringToInts msg
+    framebufferUpdate <- recvInts sock 4
     let messageType = framebufferUpdate !! 0
     let padding = framebufferUpdate !! 1
     let numberofRectangles = 256 * serverInit !! 2 + serverInit !! 3
@@ -93,3 +90,8 @@ bytestringToInts b = map ord (B8.unpack b)
 intsToBytestring :: [Int] -> B8.ByteString
 intsToBytestring b = B8.pack (map chr b)
 
+recvString :: Socket -> Int -> IO [Char]
+recvString s l = fmap B8.unpack (recv s l)
+
+recvInts :: Socket -> Int -> IO [Int]
+recvInts s l = fmap bytestringToInts (recv s l)
