@@ -26,8 +26,7 @@ connect host port = withSocketsDo $ do
     send sock $ B8.pack version
 
     -- Receive number of security types
-    msg <- recvInts sock 1
-    let numberOfSecurityTypes = head msg
+    (numberOfSecurityTypes:_) <- recvInts sock 1
 
     -- Receive security types
     securityTypes <- recvString sock numberOfSecurityTypes
@@ -43,21 +42,25 @@ connect host port = withSocketsDo $ do
     send sock (intsToBytestring [1])
 
     -- Get ServerInit message
-    serverInit <- recvInts sock 20
-    let framebufferWidth = 256 * serverInit !! 0 + serverInit !! 1
-    let framebufferHeight = 256 * serverInit !! 2 + serverInit !! 3
-    let bitsPerPixel = serverInit !! 4
-    let depth = serverInit !! 5
-    let bigEndianFlag = serverInit !! 6
-    let trueColourFlag = serverInit !! 7
-    let redMax = 256 * serverInit !! 8 + serverInit !! 9
-    let blueMax = 256 * serverInit !! 10 + serverInit !! 11
-    let greenMax = 256 * serverInit !! 12 + serverInit !! 13
-    let redShift = serverInit !! 14
-    let greenShift = serverInit !! 15
-    let blueShift = serverInit !! 16
-    -- Last 3 bytes for padding
-    putStrLn $ "serverInit: " ++ show serverInit
+    (fbW1:fbW2:
+        fbH1:fbH2:
+        bitsPerPixel:
+        depth:
+        bigEndianFlag:
+        trueColourFlag:
+        redMax1:redMax2:
+        blueMax1:blueMax2:
+        greenMax1:greenMax2:
+        redShift:
+        greenShift:
+        blueShift:
+        _) <- recvInts sock 20
+    let framebufferWidth = 256 * fbW1 + fbW2
+    let framebufferHeight = 256 * fbH1 + fbH2
+    let redMax = 256 * redMax1 + redMax2
+    let blueMax = 256 * blueMax1 + blueMax2
+    let greenMax = 256 * greenMax1 + greenMax2
+    --putStrLn $ "serverInit: " ++ show serverInit
     putStrLn $ "framebufferWidth: " ++ show framebufferWidth
     putStrLn $ "framebufferHeight: " ++ show framebufferHeight
     putStrLn $ "bitsPerPixel: " ++ show bitsPerPixel
@@ -71,12 +74,12 @@ connect host port = withSocketsDo $ do
     putStrLn $ "greenShift: " ++ show greenShift
     putStrLn $ "blueShift: " ++ show blueShift
 
-    let framebufferUpdateRequest = [3, 0, 0, 0, 0, 0, framebufferWidth `quot` 256, framebufferWidth `rem` 256, framebufferHeight `quot` 256, framebufferHeight `rem` 256]
+    let framebufferUpdateRequest = [3, 0, 0, 0, 0, 0,
+                                        framebufferWidth `quot` 256, framebufferWidth `rem` 256,
+                                        framebufferHeight `quot` 256, framebufferHeight `rem` 256]
     send sock (intsToBytestring framebufferUpdateRequest)
-    framebufferUpdate <- recvInts sock 4
-    let messageType = framebufferUpdate !! 0
-    let padding = framebufferUpdate !! 1
-    let numberofRectangles = 256 * serverInit !! 2 + serverInit !! 3
+    (messageType:padding:nR1:nR2:_) <- recvInts sock 4
+    let numberofRectangles = 256 * nR1 + nR2
     putStrLn $ "numberofRectangles: " ++ show numberofRectangles
 
     hold <- getLine
