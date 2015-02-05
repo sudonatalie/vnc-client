@@ -1,4 +1,4 @@
-import System.Environment
+import System.Environment (getArgs)
 import RFB.Client
 
 main = do
@@ -6,6 +6,6 @@ main = do
     case args of
         [host] -> do
             putStrLn $ "Connecting to " ++ host ++ "..."
-            RFB.Client.connect host 5900
+            connect host 5900
         _ -> putStrLn "Please specify the address of the host computer."
 
