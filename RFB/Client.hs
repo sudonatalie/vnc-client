@@ -74,9 +74,10 @@ connect host port = withSocketsDo $ do
     putStrLn $ "greenShift: " ++ show greenShift
     putStrLn $ "blueShift: " ++ show blueShift
 
-    let framebufferUpdateRequest = [3, 0, 0, 0, 0, 0,
-                                        framebufferWidth `quot` 256, framebufferWidth `rem` 256,
-                                        framebufferHeight `quot` 256, framebufferHeight `rem` 256]
+    let framebufferUpdateRequest =
+            [ 3, 0, 0, 0, 0, 0
+            , framebufferWidth `quot` 256, framebufferWidth `rem` 256
+            , framebufferHeight `quot` 256, framebufferHeight `rem` 256 ]
     send sock (intsToBytestring framebufferUpdateRequest)
     (messageType:padding:nR1:nR2:_) <- recvInts sock 4
     let numberofRectangles = bytesToInt [nR1, nR2]
