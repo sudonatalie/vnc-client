@@ -55,11 +55,11 @@ connect host port = withSocketsDo $ do
         greenShift:
         blueShift:
         _) <- recvInts sock 20
-    let framebufferWidth = 256 * fbW1 + fbW2
-    let framebufferHeight = 256 * fbH1 + fbH2
-    let redMax = 256 * redMax1 + redMax2
-    let blueMax = 256 * blueMax1 + blueMax2
-    let greenMax = 256 * greenMax1 + greenMax2
+    let framebufferWidth = bytesToInt [fbW1, fbW2]
+    let framebufferHeight = bytesToInt [fbH1, fbH2]
+    let redMax = bytesToInt [redMax1, redMax2]
+    let blueMax = bytesToInt [blueMax1, blueMax2]
+    let greenMax = bytesToInt [greenMax1, greenMax2]
     --putStrLn $ "serverInit: " ++ show serverInit
     putStrLn $ "framebufferWidth: " ++ show framebufferWidth
     putStrLn $ "framebufferHeight: " ++ show framebufferHeight
@@ -79,7 +79,7 @@ connect host port = withSocketsDo $ do
                                         framebufferHeight `quot` 256, framebufferHeight `rem` 256]
     send sock (intsToBytestring framebufferUpdateRequest)
     (messageType:padding:nR1:nR2:_) <- recvInts sock 4
-    let numberofRectangles = 256 * nR1 + nR2
+    let numberofRectangles = bytesToInt [nR1, nR2]
     putStrLn $ "numberofRectangles: " ++ show numberofRectangles
 
     hold <- getLine
@@ -98,3 +98,7 @@ recvString s l = fmap B8.unpack (recv s l)
 
 recvInts :: Socket -> Int -> IO [Int]
 recvInts s l = fmap bytestringToInts (recv s l)
+
+bytesToInt :: [Int] -> Int
+bytesToInt [] = 0
+bytesToInt b = last b + 256 * (bytesToInt (init b))
