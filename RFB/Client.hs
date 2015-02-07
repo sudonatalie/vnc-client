@@ -15,7 +15,7 @@ connect host port = withSocketsDo $ do
     Network.Socket.connect sock (addrAddress serverAddr)
 
     -- Check for VNC server
-    send sock B8.empty
+    sendInts sock []
     msg <- recvString sock 12
     -- TODO Verify version format
     putStr $ "Server Protocol Version: " ++ msg
@@ -23,7 +23,7 @@ connect host port = withSocketsDo $ do
     -- TODO Actually compare version numbers before blindy choosing
     let version = "RFB 003.007\n"
     putStr $ "Requsted Protocol Version: " ++ version
-    send sock $ B8.pack version
+    sendString sock version
 
     -- Receive number of security types
     (numberOfSecurityTypes:_) <- recvInts sock 1
@@ -33,13 +33,14 @@ connect host port = withSocketsDo $ do
     putStrLn $ "Server Security Types: " ++ securityTypes
 
     -- TODO Actually check security types before blindy choosing
-    send sock (intsToBytestring [1])
+    --send sock (intsToBytestring [1])
+    sendInts sock [1]
 
     -- I don't know why SecurityResult isn't being sent
     -- msg <- recv sock 1
 
     -- Allow shared desktop
-    send sock (intsToBytestring [1])
+    sendInts sock [1]
 
     -- Get ServerInit message
     (fbW1:fbW2:
@@ -78,7 +79,7 @@ connect host port = withSocketsDo $ do
             [ 3, 0, 0, 0, 0, 0
             , framebufferWidth `quot` 256, framebufferWidth `rem` 256
             , framebufferHeight `quot` 256, framebufferHeight `rem` 256 ]
-    send sock (intsToBytestring framebufferUpdateRequest)
+    sendInts sock framebufferUpdateRequest
     (messageType:padding:nR1:nR2:_) <- recvInts sock 4
     let numberofRectangles = bytesToInt [nR1, nR2]
     putStrLn $ "numberofRectangles: " ++ show numberofRectangles
@@ -99,6 +100,12 @@ recvString s l = fmap B8.unpack (recv s l)
 
 recvInts :: Socket -> Int -> IO [Int]
 recvInts s l = fmap bytestringToInts (recv s l)
+
+sendString :: Socket -> String -> IO Int
+sendString s l = send s (B8.pack l)
+
+sendInts :: Socket -> [Int] -> IO Int
+sendInts s l = send s (intsToBytestring l)
 
 bytesToInt :: [Int] -> Int
 bytesToInt [] = 0
