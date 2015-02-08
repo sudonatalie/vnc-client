@@ -110,7 +110,7 @@ sendInts s l = send s (intsToBytestring l)
 
 bytesToInt :: [Int] -> Int
 bytesToInt [] = 0
-bytesToInt b = last b + 256 * (bytesToInt (init b))
+bytesToInt b = shiftL (bytesToInt (init b)) 8 .|. (last b)
 
 hiByte :: Int -> Int
 hiByte b = shiftR (b .&. 0xFF00) 8
