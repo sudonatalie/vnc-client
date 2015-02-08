@@ -166,10 +166,10 @@ framebufferUpdateRequest sock incremental framebuffer =
                    ++ intToBytes 2 (h framebuffer))
 
 bytestringToInts :: B8.ByteString -> [Int]
-bytestringToInts b = map ord (B8.unpack b)
+bytestringToInts = map ord . B8.unpack
 
 intsToBytestring :: [Int] -> B8.ByteString
-intsToBytestring b = B8.pack (map chr b)
+intsToBytestring = B8.pack . map chr
 
 recvString :: Socket -> Int -> IO [Char]
 recvString s l = fmap B8.unpack (recv s l)
