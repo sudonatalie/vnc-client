@@ -4,6 +4,7 @@ import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
 import qualified Data.ByteString.Char8 as B8
 import Data.Char (ord, chr)
+import Data.Bits
 
 connect :: String -> Int -> IO()
 connect host port = withSocketsDo $ do
@@ -77,8 +78,8 @@ connect host port = withSocketsDo $ do
 
     let framebufferUpdateRequest =
             [ 3, 0, 0, 0, 0, 0
-            , framebufferWidth `quot` 256, framebufferWidth `rem` 256
-            , framebufferHeight `quot` 256, framebufferHeight `rem` 256 ]
+            , hiByte framebufferWidth, loByte framebufferWidth
+            , hiByte framebufferHeight, loByte framebufferHeight ]
     sendInts sock framebufferUpdateRequest
     (messageType:padding:nR1:nR2:_) <- recvInts sock 4
     let numberofRectangles = bytesToInt [nR1, nR2]
@@ -110,3 +111,9 @@ sendInts s l = send s (intsToBytestring l)
 bytesToInt :: [Int] -> Int
 bytesToInt [] = 0
 bytesToInt b = last b + 256 * (bytesToInt (init b))
+
+hiByte :: Int -> Int
+hiByte b = shiftR (b .&. 0xFF00) 8
+
+loByte :: Int -> Int
+loByte b = b .&. 0xFF
