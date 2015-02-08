@@ -88,7 +88,7 @@ connect host port = withSocketsDo $ do
             , hiByte framebufferWidth, loByte framebufferWidth
             , hiByte framebufferHeight, loByte framebufferHeight ]
     sendInts sock framebufferUpdateRequest
-    (messageType:padding:nR1:nR2:_) <- recvInts sock 4
+    (messageType:_:nR1:nR2:_) <- recvInts sock 4
     let numberofRectangles = bytesToInt [nR1, nR2]
     putStrLn $ "numberofRectangles: " ++ show numberofRectangles
 
