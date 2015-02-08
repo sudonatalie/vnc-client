@@ -6,45 +6,50 @@ import qualified Data.ByteString.Char8 as B8
 import Data.Char (ord, chr)
 import Data.Bits
 
-data RFBFormat = RFBFormat { encodingTypes :: [Int]
-                           , bitsPerPixel :: Int
-                           , depth :: Int
-                           , bigEndianFlag :: Int
-                           , trueColourFlag :: Int
-                           , redMax :: Int
-                           , greenMax :: Int
-                           , blueMax :: Int
-                           , redShift :: Int
-                           , greenShift :: Int
-                           , blueShift :: Int
-                           } deriving (Show)
+data RFBFormat = RFBFormat
+    { encodingTypes :: [Int]
+    , bitsPerPixel :: Int
+    , depth :: Int
+    , bigEndianFlag :: Int
+    , trueColourFlag :: Int
+    , redMax :: Int
+    , greenMax :: Int
+    , blueMax :: Int
+    , redShift :: Int
+    , greenShift :: Int
+    , blueShift :: Int
+    } deriving (Show)
 
-data Box = Box { x :: Int
-               , y :: Int
-               , w :: Int
-               , h :: Int
-               } deriving (Show)
+data Box = Box
+    { x :: Int
+    , y :: Int
+    , w :: Int
+    , h :: Int
+    } deriving (Show)
 
-data Pixel = Pixel { r :: Int
-                   , g :: Int
-                   , b :: Int
-                   } deriving (Show)
+data Pixel = Pixel
+    { r :: Int
+    , g :: Int
+    , b :: Int
+    } deriving (Show)
 
-data Rectangle = Rectangle { rectangle :: Box
-                           , pixels :: [Pixel]
-                           }
+data Rectangle = Rectangle
+    { rectangle :: Box
+    , pixels :: [Pixel]
+    }
 
-format = RFBFormat { encodingTypes = [0]
-                   , bitsPerPixel = 32
-                   , depth = 24
-                   , bigEndianFlag = 0
-                   , trueColourFlag = 1
-                   , redMax = 255
-                   , greenMax = 255
-                   , blueMax = 255
-                   , redShift = 0
-                   , greenShift = 8
-                   , blueShift =  16 }
+format = RFBFormat
+    { encodingTypes = [0]
+    , bitsPerPixel = 32
+    , depth = 24
+    , bigEndianFlag = 0
+    , trueColourFlag = 1
+    , redMax = 255
+    , greenMax = 255
+    , blueMax = 255
+    , redShift = 0
+    , greenShift = 8
+    , blueShift =  16 }
 
 connect :: String -> Int -> IO()
 connect host port = withSocketsDo $ do
@@ -115,8 +120,8 @@ connect host port = withSocketsDo $ do
      w1:w2:
      h1:h2:
      _) <- recvInts sock 12
-    let box1 = Box { x = bytesToInt[x1, x2]
-                   , y = bytesToInt[y1, y2]
+    let box1 = Box { x = bytesToInt [x1, x2]
+                   , y = bytesToInt [y1, y2]
                    , w = bytesToInt [w1, w2]
                    , h = bytesToInt [h1, h2] }
 
