@@ -51,18 +51,23 @@ connect host port = withSocketsDo $ do
         bigEndianFlag:
         trueColourFlag:
         redMax1:redMax2:
-        blueMax1:blueMax2:
         greenMax1:greenMax2:
+        blueMax1:blueMax2:
         redShift:
         greenShift:
         blueShift:
-        _) <- recvInts sock 20
+        _:_:_: -- padding
+        len1:len2:len3:len4:
+        _) <- recvInts sock 24
     let framebufferWidth = bytesToInt [fbW1, fbW2]
     let framebufferHeight = bytesToInt [fbH1, fbH2]
     let redMax = bytesToInt [redMax1, redMax2]
-    let blueMax = bytesToInt [blueMax1, blueMax2]
     let greenMax = bytesToInt [greenMax1, greenMax2]
-    --putStrLn $ "serverInit: " ++ show serverInit
+    let blueMax = bytesToInt [blueMax1, blueMax2]
+    let nameLength = bytesToInt [len1, len2, len3, len4]
+
+    serverName <- recvString sock nameLength
+
     putStrLn $ "framebufferWidth: " ++ show framebufferWidth
     putStrLn $ "framebufferHeight: " ++ show framebufferHeight
     putStrLn $ "bitsPerPixel: " ++ show bitsPerPixel
@@ -70,11 +75,13 @@ connect host port = withSocketsDo $ do
     putStrLn $ "bigEndianFlag: " ++ show bigEndianFlag
     putStrLn $ "trueColourFlag: " ++ show trueColourFlag
     putStrLn $ "redMax: " ++ show redMax
-    putStrLn $ "blueMax: " ++ show blueMax
     putStrLn $ "greenMax: " ++ show greenMax
+    putStrLn $ "blueMax: " ++ show blueMax
     putStrLn $ "redShift: " ++ show redShift
     putStrLn $ "greenShift: " ++ show greenShift
     putStrLn $ "blueShift: " ++ show blueShift
+    putStrLn $ "nameLength: " ++ show nameLength
+    putStrLn $ "serverName: " ++ serverName
 
     let framebufferUpdateRequest =
             [ 3, 0, 0, 0, 0, 0
