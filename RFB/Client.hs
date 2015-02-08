@@ -30,8 +30,8 @@ connect host port = withSocketsDo $ do
     (numberOfSecurityTypes:_) <- recvInts sock 1
 
     -- Receive security types
-    securityTypes <- recvString sock numberOfSecurityTypes
-    putStrLn $ "Server Security Types: " ++ securityTypes
+    securityTypes <- recvInts sock numberOfSecurityTypes
+    putStrLn $ "Server Security Types: " ++ show securityTypes
 
     -- TODO Actually check security types before blindy choosing
     --send sock (intsToBytestring [1])
