@@ -83,23 +83,27 @@ connect host port = withSocketsDo $ do
     
     -- Reveive 16 bytes challenge
     challenge <- recvInts sock 16
-    putStrLn $ "Challenge : " ++ show challenge 
+    -- putStrLn $ "Challenge : " ++ show challenge 
     
-   -- challenge = [125,102,186,0,253,221,4,64,154,249,213,155,187,61,189,28]
-    let cha1 = concatMap decToBin (firstHalf challenge)
-    let cha2 = concatMap decToBin (lastHalf challenge)
+    putStrLn "Input password: "         
+    mykey <- getLine
+    let subkeys = getSubkeys mykey
+    
+    -- challenge = [125,102,186,0,253,221,4,64,154,249,213,155,187,61,189,28]
+    let cha1 = concatMap decToBin8 (firstHalf challenge)
+    let cha2 = concatMap decToBin8 (lastHalf challenge)
         
-    let res1 = desEncryption cha1
-    let res2 = desEncryption cha2
+    let res1 = desEncryption cha1 subkeys
+    let res2 = desEncryption cha2 subkeys
     let cyphertext = res1 ++ res2
-    putStrLn $ "cyphertext : " ++ show cyphertext
+    -- putStrLn $ "cyphertext : " ++ show cyphertext
     
+    -- send back encrypted challenge
     sendInts sock cyphertext
     
-
-    -- I don't know why SecurityResult isn't being sent
+    -- receive security result. type: U32.
     msgRes <- recv sock 4
-    putStrLn $ "security result : " ++ show msgRes
+    -- putStrLn $ "security result : " ++ show msgRes
 
     -- Allow shared desktop
     sendInts sock [1]
@@ -221,71 +225,65 @@ rawToPixels (r:g:b:a:t) = (Pixel r g b) : rawToPixels t
 
 -- new defined functions used by DES Encryption starts here
 ----------------
-decToBin :: Int -> [Int]
-decToBin xs = extendTo8BitsLeft (dec2Bin xs)
-
-extendTo8BitsLeft :: [Int] -> [Int]
-extendTo8BitsLeft xs = reverse (extendTo8Bits (reverse xs))
-
-desEncryption :: [Int] -> [Int]
-desEncryption xs = res
+desEncryption :: [Int] -> [[Int]] -> [Int]
+desEncryption xs subkeys = res
         where
         chaIP = initPermutation xs
         l0 = firstHalf chaIP
         r0 = lastHalf chaIP -- input for feistel function
 
         l1 = r0
-        r1 = xorTuple (zip l0 (feistel r0 0))
+        r1 = xorTuple (zip l0 (feistel r0 0 subkeys))
 
         l2 = r1
-        r2 = xorTuple (zip l1 (feistel r1 1))
+        r2 = xorTuple (zip l1 (feistel r1 1 subkeys))
 
         l3 = r2
-        r3 = xorTuple (zip l2 (feistel r2 2))
+        r3 = xorTuple (zip l2 (feistel r2 2 subkeys))
 
         l4 = r3
-        r4 = xorTuple (zip l3 (feistel r3 3))
+        r4 = xorTuple (zip l3 (feistel r3 3 subkeys))
 
         l5 = r4
-        r5 = xorTuple (zip l4 (feistel r4 4))
+        r5 = xorTuple (zip l4 (feistel r4 4 subkeys))
 
         l6 = r5
-        r6 = xorTuple (zip l5 (feistel r5 5))
+        r6 = xorTuple (zip l5 (feistel r5 5 subkeys))
         
         l7 = r6
-        r7 = xorTuple (zip l6 (feistel r6 6))
+        r7 = xorTuple (zip l6 (feistel r6 6 subkeys))
         
         l8 = r7
-        r8 = xorTuple (zip l7 (feistel r7 7))
+        r8 = xorTuple (zip l7 (feistel r7 7 subkeys))
         
         l9 = r8
-        r9 = xorTuple (zip l8 (feistel r8 8))
+        r9 = xorTuple (zip l8 (feistel r8 8 subkeys))
         
         l10 = r9
-        r10 = xorTuple (zip l9 (feistel r9 9))
+        r10 = xorTuple (zip l9 (feistel r9 9 subkeys))
         
         l11 = r10
-        r11 = xorTuple (zip l10 (feistel r10 10))
+        r11 = xorTuple (zip l10 (feistel r10 10 subkeys))
         
         l12 = r11
-        r12 = xorTuple (zip l11 (feistel r11 11))
+        r12 = xorTuple (zip l11 (feistel r11 11 subkeys))
         
         l13 = r12
-        r13 = xorTuple (zip l12 (feistel r12 12))
+        r13 = xorTuple (zip l12 (feistel r12 12 subkeys))
         
         l14 = r13
-        r14 = xorTuple (zip l13 (feistel r13 13))
+        r14 = xorTuple (zip l13 (feistel r13 13 subkeys))
         
         l15 = r14
-        r15 = xorTuple (zip l14 (feistel r14 14))
+        r15 = xorTuple (zip l14 (feistel r14 14 subkeys))
         
         r16 = r15
-        l16 = xorTuple (zip l15 (feistel r15 15))
+        l16 = xorTuple (zip l15 (feistel r15 15 subkeys))
         
         resultBits = finalPermutation (l16 ++ r16)
         
         result = splitEvery 8 resultBits
-        res = map bin2Dec result
+        res = map binToDec result
 
 -- DES functions
 ------------------------------------------------------------------------
@@ -299,8 +297,8 @@ finalPermutation xs = permutation xs fp
 
 -- feistel functions
 ------------------------------------------------------------------------
-feistel :: [Int] -> Int -> [Int]
-feistel rightBlock roundCount = feistelPermutation (feistelSub (splitEvery 6 (feistelMix rightBlock (subkeys !! roundCount))))
+feistel :: [Int] -> Int -> [[Int]] -> [Int]
+feistel rightBlock roundCount subkeys = feistelPermutation (feistelSub (splitEvery 6 (feistelMix rightBlock (subkeys !! roundCount))))
 
 -- feistel key mixing with feistel expansion
 feistelMix :: [Int] -> [Int] -> [Int]
@@ -323,7 +321,7 @@ localSub mixs i
 
 lookupSTable :: [Int] -> [Int] -> [Int]
 lookupSTable block table = ext4BL 
-        (dec2Bin (table !! ((getRow block) * 16 + (getColumn block))))
+        (decToBin (table !! ((getRow block) * 16 + (getColumn block))))
 
 -- extend to 4-bit list, with 0s added by the left side
 ext4BL :: [Int] -> [Int]
@@ -339,7 +337,7 @@ getRow bitList
                      l = last bitList   
                                          
 getColumn :: [Int] -> Int
-getColumn xs = bin2Dec (init (tail xs))
+getColumn xs = binToDec (init (tail xs))
 
 -- Key management
 ------------------------------------------------------------------------
@@ -351,88 +349,93 @@ permutedChoice1 xs = permutation xs pc1
 permutedChoice2 :: [Int] -> [Int]
 permutedChoice2 xs = permutation xs pc2
 
-key = concatMap char2Bits "cat"
-key64 = extendTo64Bits key
-
-char2Bits :: Char -> [Int]
-char2Bits xs = reverse (charToBits xs)
-
-keypc1 = permutedChoice1 key64
-left0 = firstHalf keypc1
-right0 = lastHalf keypc1
-
-left1 = rotateLeft left0 (ls !! 0)
-right1 = rotateLeft right0 (ls !! 0)
-subkey1 = permutedChoice2 (left1 ++ right1)
-
-left2 = rotateLeft left1 (ls !! 1)
-right2 = rotateLeft right1 (ls !! 1)
-subkey2 = permutedChoice2 (left2 ++ right2)
-
-left3 = rotateLeft left2 (ls !! 2)
-right3 = rotateLeft right2 (ls !! 2)
-subkey3 = permutedChoice2 (left3 ++ right3)
-
-left4 = rotateLeft left3 (ls !! 3)
-right4 = rotateLeft right3 (ls !! 3)
-subkey4 = permutedChoice2 (left4 ++ right4)
-
-left5 = rotateLeft left4 (ls !! 4)
-right5 = rotateLeft right4 (ls !! 4)
-subkey5 = permutedChoice2 (left5 ++ right5)
-
-left6 = rotateLeft left5 (ls !! 5)
-right6 = rotateLeft right5 (ls !! 5)
-subkey6 = permutedChoice2 (left6 ++ right6)
-
-left7 = rotateLeft left6 (ls !! 6)
-right7 = rotateLeft right6 (ls !! 6)
-subkey7 = permutedChoice2 (left7 ++ right7)
-
-left8 = rotateLeft left7 (ls !! 7)
-right8 = rotateLeft right7 (ls !! 7)
-subkey8 = permutedChoice2 (left8 ++ right8)
-
-left9 = rotateLeft left8 (ls !! 8)
-right9 = rotateLeft right8 (ls !! 8)
-subkey9 = permutedChoice2 (left9 ++ right9)
-
-left10 = rotateLeft left9 (ls !! 9)
-right10 = rotateLeft right9 (ls !! 9)
-subkey10 = permutedChoice2 (left10 ++ right10)
-
-left11 = rotateLeft left10 (ls !! 10)
-right11 = rotateLeft right10 (ls !! 10)
-subkey11 = permutedChoice2 (left11 ++ right11)
-
-left12 = rotateLeft left11 (ls !! 11)
-right12 = rotateLeft right11 (ls !! 11)
-subkey12 = permutedChoice2 (left12 ++ right12)
-
-left13 = rotateLeft left12 (ls !! 12)
-right13 = rotateLeft right12 (ls !! 12)
-subkey13 = permutedChoice2 (left13 ++ right13)
-
-left14 = rotateLeft left13 (ls !! 13)
-right14 = rotateLeft right13 (ls !! 13)
-subkey14 = permutedChoice2 (left14 ++ right14)
-
-left15 = rotateLeft left14 (ls !! 14)
-right15 = rotateLeft right14 (ls !! 14)
-subkey15 = permutedChoice2 (left15 ++ right15)
-
-left16 = rotateLeft left15 (ls !! 15)
-right16 = rotateLeft right15 (ls !! 15)
-subkey16 = permutedChoice2 (left16 ++ right16)
-
-subkeys = [subkey1, subkey2, subkey3, subkey4, subkey5,
-         subkey6, subkey7, subkey8, subkey9, subkey10,
-         subkey11, subkey12, subkey13, subkey14, subkey15, subkey16]
+getSubkeys :: [Char] -> [[Int]]
+getSubkeys mykey = subkeys
+        where
+        -- VNC authentication: Mirror
+        key2 = concatMap charToBitsVNC mykey
+        -- General DES
+        -- key2 = concatMap charToBits mykey
+        key64 = extendTo64Bits key2
+        
+        keypc1 = permutedChoice1 key64
+        left0 = firstHalf keypc1
+        right0 = lastHalf keypc1
+        
+        left1 = rotateLeft left0 (ls !! 0)
+        right1 = rotateLeft right0 (ls !! 0)
+        subkey1 = permutedChoice2 (left1 ++ right1)
+        
+        left2 = rotateLeft left1 (ls !! 1)
+        right2 = rotateLeft right1 (ls !! 1)
+        subkey2 = permutedChoice2 (left2 ++ right2)
+        
+        left3 = rotateLeft left2 (ls !! 2)
+        right3 = rotateLeft right2 (ls !! 2)
+        subkey3 = permutedChoice2 (left3 ++ right3)
+        
+        left4 = rotateLeft left3 (ls !! 3)
+        right4 = rotateLeft right3 (ls !! 3)
+        subkey4 = permutedChoice2 (left4 ++ right4)
+        
+        left5 = rotateLeft left4 (ls !! 4)
+        right5 = rotateLeft right4 (ls !! 4)
+        subkey5 = permutedChoice2 (left5 ++ right5)
+        
+        left6 = rotateLeft left5 (ls !! 5)
+        right6 = rotateLeft right5 (ls !! 5)
+        subkey6 = permutedChoice2 (left6 ++ right6)
+        
+        left7 = rotateLeft left6 (ls !! 6)
+        right7 = rotateLeft right6 (ls !! 6)
+        subkey7 = permutedChoice2 (left7 ++ right7)
+        
+        left8 = rotateLeft left7 (ls !! 7)
+        right8 = rotateLeft right7 (ls !! 7)
+        subkey8 = permutedChoice2 (left8 ++ right8)
+        
+        left9 = rotateLeft left8 (ls !! 8)
+        right9 = rotateLeft right8 (ls !! 8)
+        subkey9 = permutedChoice2 (left9 ++ right9)
+        
+        left10 = rotateLeft left9 (ls !! 9)
+        right10 = rotateLeft right9 (ls !! 9)
+        subkey10 = permutedChoice2 (left10 ++ right10)
+        
+        left11 = rotateLeft left10 (ls !! 10)
+        right11 = rotateLeft right10 (ls !! 10)
+        subkey11 = permutedChoice2 (left11 ++ right11)
+        
+        left12 = rotateLeft left11 (ls !! 11)
+        right12 = rotateLeft right11 (ls !! 11)
+        subkey12 = permutedChoice2 (left12 ++ right12)
+        
+        left13 = rotateLeft left12 (ls !! 12)
+        right13 = rotateLeft right12 (ls !! 12)
+        subkey13 = permutedChoice2 (left13 ++ right13)
+        
+        left14 = rotateLeft left13 (ls !! 13)
+        right14 = rotateLeft right13 (ls !! 13)
+        subkey14 = permutedChoice2 (left14 ++ right14)
+        
+        left15 = rotateLeft left14 (ls !! 14)
+        right15 = rotateLeft right14 (ls !! 14)
+        subkey15 = permutedChoice2 (left15 ++ right15)
+        
+        left16 = rotateLeft left15 (ls !! 15)
+        right16 = rotateLeft right15 (ls !! 15)
+        subkey16 = permutedChoice2 (left16 ++ right16)
+        
+        subkeys = [subkey1, subkey2, subkey3, subkey4, subkey5,
+                 subkey6, subkey7, subkey8, subkey9, subkey10,
+                 subkey11, subkey12, subkey13, subkey14, subkey15, subkey16]
 
 -- Other functions
 ------------------------------------------------------------------------
 
 -- if the password length shorter than 8(64 bits), add 0s to the end
+-- TODO These extend functions add 0s to the tail
+-- However, in most of cases 0s need to be added before head
 extendTo64Bits :: [Int] -> [Int]
 extendTo64Bits bitList = reverse (extendList (reverse bitList) (length bitList) 64)
 
@@ -470,26 +473,36 @@ splitEvery n xs
                 | n >= length xs = [xs]
                 | otherwise = (take n xs) : splitEvery n (drop n xs) 
 
--- Convert char to binary (bits, bit list)
+-- Convert char to binary (8-bit list)
 charToBits :: Char -> [Int]
-charToBits c = reverse (extendTo8Bits (reverse (dec2Bin (ord c))))
+charToBits c = reverse (extendTo8Bits (reverse (decToBin (ord c))))
+-- 
+charToBitsVNC :: Char -> [Int]
+charToBitsVNC xs = reverse (charToBits xs)
+
+-- Convert decimal to 8-bit binary
+decToBin8 :: Int -> [Int]
+decToBin8 xs = extendTo8BitsLeft (decToBin xs)
+
+extendTo8BitsLeft :: [Int] -> [Int]
+extendTo8BitsLeft xs = reverse (extendTo8Bits (reverse xs))
 
 -- Convert decimal(Int) to binary
-dec2Bin :: Int -> [Int]
-dec2Bin n = reverse (toBin n)
+decToBin :: Int -> [Int]
+decToBin n = reverse (localD2B n)
 
-toBin :: Int -> [Int]
-toBin 0 = [0]
-toBin 1 = [1]
-toBin n = (mod n 2) : toBin (div n 2)
+localD2B :: Int -> [Int]
+localD2B 0 = [0]
+localD2B 1 = [1]
+localD2B n = (mod n 2) : localD2B (div n 2)
 
 -- Convert binary to decimal
-bin2Dec :: [Int] -> Int
-bin2Dec xs = localB2I (reverse xs)
+binToDec :: [Int] -> Int
+binToDec xs = localB2D (reverse xs)
  
-localB2I :: [Int] -> Int
-localB2I [] = 0
-localB2I (x:xs) = x + 2 * localB2I xs
+localB2D :: [Int] -> Int
+localB2D [] = 0
+localB2D (x:xs) = x + 2 * localB2D xs
 
 -- Shift(rotate) a bit list
 shiftLeft :: [Int] -> Int -> [Int]
