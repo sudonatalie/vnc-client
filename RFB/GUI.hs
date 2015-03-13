@@ -18,11 +18,9 @@ connect host port password = withSocketsDo $ do
     sendInts sock []
     msg <- recvString sock 12
     -- TODO Verify version format
-    putStr $ "Server Protocol Version: " ++ msg
 
     -- TODO Actually compare version numbers before blindy choosing
     let version = "RFB 003.007\n"
-    putStr $ "Requsted Protocol Version: " ++ version
     sendString sock version
 
     -- Receive number of security types
@@ -30,14 +28,12 @@ connect host port password = withSocketsDo $ do
 
     -- Receive security types
     securityTypes <- recvInts sock numberOfSecurityTypes
-    putStrLn $ "Server Security Types: " ++ show securityTypes
 
     -- TODO Actually check security types before blindy choosing
     sendInts sock [2]
     
     -- Reveive 16 bytes challenge
     challenge <- recvInts sock 16
-    -- putStrLn $ "Challenge : " ++ show challenge
 
     let subkeys = getSubkeys password
 
@@ -48,14 +44,12 @@ connect host port password = withSocketsDo $ do
     let res1 = desEncryption cha1 subkeys
     let res2 = desEncryption cha2 subkeys
     let cyphertext = res1 ++ res2
-    -- putStrLn $ "cyphertext : " ++ show cyphertext
     
     -- send back encrypted challenge
     sendInts sock cyphertext
     
     -- receive security result. type: U32.
     msgRes <- recv sock 4
-    -- putStrLn $ "security result : " ++ show msgRes
 
     -- Allow shared desktop
     sendInts sock [1]
@@ -74,10 +68,6 @@ connect host port password = withSocketsDo $ do
 
     -- Get ServerName
     serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
-
-    putStrLn $ "Server Name: " ++ serverName
-    putStrLn $ "Framebuffer: " ++ show framebuffer
-    putStrLn $ "Encoding and pixel format: " ++ show format
 
     setEncodings sock format
     setPixelFormat sock format
@@ -102,8 +92,6 @@ connect host port password = withSocketsDo $ do
 
     let rectangle1 = Rectangle { rectangle = box1
                                 , pixels = colours }
-
-    putStrLn $ "First Pixel: " ++ show (head (pixels rectangle1))
 
     -- Close socket
     sClose sock
