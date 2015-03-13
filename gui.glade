@@ -9,30 +9,79 @@
         <property name="visible">True</property>
         <property name="border_width">4</property>
         <property name="orientation">vertical</property>
-        <property name="spacing">4</property>
+        <property name="spacing">10</property>
         <child>
-          <widget class="GtkLabel" id="title">
+          <widget class="GtkLabel" id="label1">
             <property name="visible">True</property>
-            <property name="ypad">3</property>
-            <property name="label" translatable="yes">Enter the VNC server address:</property>
+            <property name="label" translatable="yes">&lt;span size="larger" weight="bold"&gt;VNC Client&lt;/span&gt;</property>
+            <property name="use_markup">True</property>
           </widget>
           <packing>
             <property name="position">0</property>
           </packing>
         </child>
         <child>
-          <widget class="GtkEntry" id="entry">
+          <widget class="GtkHBox" id="hbox1">
             <property name="visible">True</property>
-            <property name="can_focus">True</property>
+            <property name="spacing">10</property>
+            <child>
+              <widget class="GtkLabel" id="label2">
+                <property name="visible">True</property>
+                <property name="xalign">1</property>
+                <property name="label" translatable="yes">VNC Server:</property>
+              </widget>
+              <packing>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <widget class="GtkEntry" id="entry">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+              </widget>
+              <packing>
+                <property name="position">1</property>
+              </packing>
+            </child>
           </widget>
           <packing>
             <property name="position">1</property>
           </packing>
         </child>
         <child>
+          <widget class="GtkHBox" id="hbox2">
+            <property name="visible">True</property>
+            <property name="spacing">10</property>
+            <child>
+              <widget class="GtkLabel" id="label3">
+                <property name="visible">True</property>
+                <property name="xalign">1</property>
+                <property name="label" translatable="yes">Password:</property>
+              </widget>
+              <packing>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <widget class="GtkEntry" id="password">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="visibility">False</property>
+              </widget>
+              <packing>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </widget>
+          <packing>
+            <property name="position">2</property>
+          </packing>
+        </child>
+        <child>
           <widget class="GtkHBox" id="hbox">
             <property name="visible">True</property>
             <property name="spacing">4</property>
+            <property name="homogeneous">True</property>
             <child>
               <widget class="GtkButton" id="connectButton">
                 <property name="label">gtk-connect</property>
@@ -59,10 +108,13 @@
             </child>
           </widget>
           <packing>
-            <property name="position">2</property>
+            <property name="position">3</property>
           </packing>
         </child>
       </widget>
     </child>
+  </widget>
+  <widget class="GtkMenu" id="menu1">
+    <property name="visible">True</property>
   </widget>
 </glade-interface>

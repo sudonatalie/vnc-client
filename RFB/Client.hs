@@ -51,8 +51,8 @@ format = RFBFormat
     , greenShift = 8
     , blueShift =  16 }
 
-connect :: String -> Int -> IO()
-connect host port = withSocketsDo $ do
+connect :: String -> Int -> String -> IO()
+connect host port password = withSocketsDo $ do
 
     -- Connect to server via socket
     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
@@ -83,12 +83,16 @@ connect host port = withSocketsDo $ do
     
     -- Reveive 16 bytes challenge
     challenge <- recvInts sock 16
-    -- putStrLn $ "Challenge : " ++ show challenge 
-    
-    putStrLn "Input password: "         
-    mykey <- getLine
-    let subkeys = getSubkeys mykey
-    
+    -- putStrLn $ "Challenge : " ++ show challenge
+
+
+    if (null password) then do
+        putStrLn "Input password: "
+        password <- getLine -- Obviously this doesn't work, fix in refactoring
+        return ()
+    else return ()
+    let subkeys = getSubkeys password
+
     -- challenge = [125,102,186,0,253,221,4,64,154,249,213,155,187,61,189,28]
     let cha1 = concatMap decToBin8 (firstHalf challenge)
     let cha2 = concatMap decToBin8 (lastHalf challenge)
@@ -152,8 +156,6 @@ connect host port = withSocketsDo $ do
                                 , pixels = colours }
 
     putStrLn $ "First Pixel: " ++ show (head (pixels rectangle1))
-
-    hold <- getLine
 
     -- Close socket
     sClose sock
