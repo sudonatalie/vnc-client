@@ -1,14 +1,15 @@
 import System.Environment (getArgs)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Glade
-import RFB.Client
+import RFB.GUI as GUI
+import RFB.CLI as CLI
 
 main = do
     args <- getArgs
     case args of
         [host] -> do
             putStrLn $ "Connecting to " ++ host ++ "..."
-            connect host 5900 ""
+            CLI.connect host 5900
         [] -> do
             initGUI
             Just xml <- xmlNew "gui.glade"
@@ -24,7 +25,7 @@ main = do
                 host <- get entry entryText
                 password <- get passwordBox entryText
                 putStrLn $ "Connecting to " ++ host ++ "..."
-                connect host 5900 password
+                GUI.connect host 5900 password
             widgetShowAll window
             mainGUI
         _ -> putStrLn "Please specify the address of the host computer."
