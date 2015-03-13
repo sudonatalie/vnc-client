@@ -1,6 +1,7 @@
 module RFB.GUI where
 
 import RFB.Client
+import RFB.Security
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
 
