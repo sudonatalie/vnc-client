@@ -7,82 +7,83 @@ import Data.Char (ord, chr)
 import Data.Bits
 
 data RFBFormat = RFBFormat
-    { encodingTypes :: [Int]
-    , bitsPerPixel :: Int
-    , depth :: Int
-    , bigEndianFlag :: Int
-    , trueColourFlag :: Int
-    , redMax :: Int
-    , greenMax :: Int
-    , blueMax :: Int
-    , redShift :: Int
-    , greenShift :: Int
-    , blueShift :: Int
-    } deriving (Show)
+	{ encodingTypes :: [Int]
+	, bitsPerPixel :: Int
+	, depth :: Int
+	, bigEndianFlag :: Int
+	, trueColourFlag :: Int
+	, redMax :: Int
+	, greenMax :: Int
+	, blueMax :: Int
+	, redShift :: Int
+	, greenShift :: Int
+	, blueShift :: Int
+	} deriving (Show)
 
 data Box = Box
-    { x :: Int
-    , y :: Int
-    , w :: Int
-    , h :: Int
-    } deriving (Show)
+	{ x :: Int
+	, y :: Int
+	, w :: Int
+	, h :: Int
+	} deriving (Show)
 
-data Pixel = Pixel
-    { r :: Int
-    , g :: Int
-    , b :: Int
-    } deriving (Show)
+{-data Pixel = Pixel
+	{ r :: Int
+	, g :: Int
+	, b :: Int
+	} deriving (Show)
+-}
 
 data Rectangle = Rectangle
-    { rectangle :: Box
-    , pixels :: [Pixel]
-    }
+	{ rectangle :: Box
+	, pixels :: [Pixel]
+	}
 
 format = RFBFormat
-    { encodingTypes = [0]
-    , bitsPerPixel = 32
-    , depth = 24
-    , bigEndianFlag = 0
-    , trueColourFlag = 1
-    , redMax = 255
-    , greenMax = 255
-    , blueMax = 255
-    , redShift = 0
-    , greenShift = 8
-    , blueShift =  16 }
+	{ encodingTypes = [0]
+	, bitsPerPixel = 32
+	, depth = 24
+	, bigEndianFlag = 0
+	, trueColourFlag = 1
+	, redMax = 255
+	, greenMax = 255
+	, blueMax = 255
+	, redShift = 0
+	, greenShift = 8
+	, blueShift =  16 }
 
 setEncodings :: Socket -> RFBFormat -> IO Int
 setEncodings sock format =
-    sendInts sock ([ 2     -- message-type
-                   , 0 ]    -- padding
-                   ++ intToBytes 2 (length (encodingTypes format))
-                   ++ concat (map (intToBytes 4) (encodingTypes format)))
+	sendInts sock ([ 2     -- message-type
+				   , 0 ]    -- padding
+				   ++ intToBytes 2 (length (encodingTypes format))
+				   ++ concat (map (intToBytes 4) (encodingTypes format)))
 
 setPixelFormat :: Socket -> RFBFormat -> IO Int
 setPixelFormat sock format =
-    sendInts sock ([ 0         -- message-type
-                   , 0, 0, 0   -- padding
-                   , bitsPerPixel format
-                   , depth format
-                   , bigEndianFlag format
-                   , trueColourFlag format ]
-                   ++ intToBytes 2 (redMax format)
-                   ++ intToBytes 2 (greenMax format)
-                   ++ intToBytes 2 (blueMax format)
-                   ++
-                   [ redShift format
-                   , greenShift format
-                   , blueShift format
-                   , 0, 0, 0 ]) -- padding
+	sendInts sock ([ 0         -- message-type
+				   , 0, 0, 0   -- padding
+				   , bitsPerPixel format
+				   , depth format
+				   , bigEndianFlag format
+				   , trueColourFlag format ]
+				   ++ intToBytes 2 (redMax format)
+				   ++ intToBytes 2 (greenMax format)
+				   ++ intToBytes 2 (blueMax format)
+				   ++
+				   [ redShift format
+				   , greenShift format
+				   , blueShift format
+				   , 0, 0, 0 ]) -- padding
 
 framebufferUpdateRequest :: Socket -> Int -> Box -> IO Int
 framebufferUpdateRequest sock incremental framebuffer =
-    sendInts sock ([ 3  -- message-type
-                   , incremental]
-                   ++ intToBytes 2 (x framebuffer)
-                   ++ intToBytes 2 (y framebuffer)
-                   ++ intToBytes 2 (w framebuffer)
-                   ++ intToBytes 2 (h framebuffer))
+	sendInts sock ([ 3  -- message-type
+				   , incremental]
+				   ++ intToBytes 2 (x framebuffer)
+				   ++ intToBytes 2 (y framebuffer)
+				   ++ intToBytes 2 (w framebuffer)
+				   ++ intToBytes 2 (h framebuffer))
 
 bytestringToInts :: B8.ByteString -> [Int]
 bytestringToInts = map ord . B8.unpack
@@ -111,6 +112,42 @@ intToBytes 0 _ = []
 intToBytes l 0 = 0 : intToBytes (l-1) 0
 intToBytes l b = intToBytes (l-1) (shiftR (b .&. 0xFF00) 8) ++ [ b .&. 0xFF ]
 
-rawToPixels :: [Int] -> [Pixel]
+{-rawToPixels :: [Int] -> [Pixel]
 rawToPixels [] = []
 rawToPixels (r:g:b:a:t) = (Pixel r g b) : rawToPixels t
+-}
+displayRectangles :: Display -> Window -> GC -> Socket -> Int -> IO ()
+displayRectangles _ _ _ _ 0 = return ()
+displayRectangles display win gc sock n = do
+	(x1:x2:
+	 y1:y2:
+	 w1:w2:
+	 h1:h2:
+	 _) <- recvInts sock 12
+	let rect = Box { x = bytesToInt [x1, x2]
+				   , y = bytesToInt [y1, y2]
+				   , w = bytesToInt [w1, w2]
+				   , h = bytesToInt [h1, h2] }
+	recvAndDisplayPixels display win gc sock (x rect) (w rect) (h rect) (x rect) (y rect) (bitsPerPixel format)
+	displayRectangles display win gc sock (n-1)
+
+recvAndDisplayPixels :: Display -> Window -> GC -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+recvAndDisplayPixels _ _ _ _ _ _ 0 _ _ _ = return ()
+recvAndDisplayPixels display win gc sock x0 w h x y 24 = do
+	r:g:b:_ <- recvInts sock 3
+	displayPixel display win gc x y r g b
+	if ((x+1) >= w)
+		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 24
+		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 24
+recvAndDisplayPixels display win gc sock x0 w h x y 32 = do
+	r:g:b:_:_ <- recvInts sock 4
+	displayPixel display win gc x y r g b
+	if ((x+1) >= w)
+		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 32
+		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 32
+recvAndDisplayPixels _ _ _ _ _ _ _ _ _ _ = return ()
+
+displayPixel :: Display -> Window -> GC -> Int -> Int -> Int -> Int -> Int -> IO ()
+displayPixel display win gc x y r g b = do
+	setForeground display gc (fromIntegral (bytesToInt [r, g, b]))
+	drawPoint display win gc (fromIntegral x) (fromIntegral y)
