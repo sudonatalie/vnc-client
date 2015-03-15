@@ -52,6 +52,16 @@ format = RFBFormat
 	, greenShift = 8
 	, blueShift =  16 }
 
+mkUnmanagedWindow :: Display -> Screen -> Window -> Position -> Position -> Dimension -> Dimension -> IO Window
+mkUnmanagedWindow d s rw x y w h = do
+	let visual = defaultVisualOfScreen s
+	let attrmask = cWOverrideRedirect
+	allocaSetWindowAttributes $
+		\attributes -> do
+		   set_override_redirect attributes True
+		   createWindow d rw x y w h 0 (defaultDepthOfScreen s)
+						inputOutput visual attrmask attributes
+
 setEncodings :: Socket -> RFBFormat -> IO Int
 setEncodings sock format =
 	sendInts sock ([ 2     -- message-type
