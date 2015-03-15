@@ -6,6 +6,10 @@ import qualified Data.ByteString.Char8 as B8
 import Data.Char (ord, chr)
 import Data.Bits
 
+import Graphics.X11.Xlib
+import System.Exit (exitWith, ExitCode(..))
+import Control.Concurrent (threadDelay)
+
 data RFBFormat = RFBFormat
 	{ encodingTypes :: [Int]
 	, bitsPerPixel :: Int
@@ -122,10 +126,6 @@ intToBytes 0 _ = []
 intToBytes l 0 = 0 : intToBytes (l-1) 0
 intToBytes l b = intToBytes (l-1) (shiftR (b .&. 0xFF00) 8) ++ [ b .&. 0xFF ]
 
-{-rawToPixels :: [Int] -> [Pixel]
-rawToPixels [] = []
-rawToPixels (r:g:b:a:t) = (Pixel r g b) : rawToPixels t
--}
 displayRectangles :: Display -> Window -> GC -> Socket -> Int -> IO ()
 displayRectangles _ _ _ _ 0 = return ()
 displayRectangles display win gc sock n = do
