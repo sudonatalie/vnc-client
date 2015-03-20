@@ -5,6 +5,10 @@ import RFB.Security
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
 
+import Graphics.X11.Xlib
+import System.Exit (exitWith, ExitCode(..))
+import Control.Concurrent (threadDelay)
+
 connect :: String -> Int -> String -> IO()
 connect host port password = withSocketsDo $ do
 
