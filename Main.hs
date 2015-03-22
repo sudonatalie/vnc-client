@@ -1,16 +1,58 @@
 import System.Environment (getArgs)
+import System.Console.GetOpt
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Glade
 import RFB.GUI as GUI
 import RFB.CLI as CLI
 
+-- Command line options
+data Options = Options
+    { optVerbose :: Bool
+    , optGraphical :: Bool
+    , optPort :: Int
+    } deriving Show
+
+-- Default options
+defaultOptions = Options
+    { optVerbose = False
+    , optGraphical = False
+    , optPort = 5900
+    }
+
+header = "Usage: vnc-client [OPTION...] host"
+
+-- Option descriptions
+options :: [OptDescr (Options -> Options)]
+options =
+    [ Option ['v'] ["verbose"]
+        (NoArg (\ opts -> opts { optVerbose = True }))
+        "verbose mode for more information output"
+    , Option ['g'] ["gui"]
+        (NoArg (\ opts -> opts { optGraphical = True }))
+        "configure client via graphical UI"
+    , Option ['p'] ["port"]
+        (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")
+        "port number (default: 5900)"
+    ]
+
+parseOpts :: [String] -> IO (Options, [String])
+parseOpts argv =
+    case getOpt Permute options argv of
+        (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
+        (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
+
 main = do
+    -- Get and parse command line arguments
     args <- getArgs
-    case args of
-        [host] -> do
-            putStrLn $ "Connecting to " ++ host ++ "..."
-            CLI.connect host 5900
-        [] -> do
+    (Options
+            { optVerbose = verbose
+            , optGraphical = gui
+            , optPort = port }
+        , params) <- parseOpts args
+
+    -- Launch GUI if requested or hostname unspecified
+    if (gui || null params)
+        then do
             initGUI
             Just xml <- xmlNew "gui.glade"
             window <- xmlGetWidget xml castToWindow "window"
@@ -24,9 +66,18 @@ main = do
             onClicked connectButton $ do
                 host <- get entry entryText
                 password <- get passwordBox entryText
-                putStrLn $ "Connecting to " ++ host ++ "..."
+                if (verbose)
+                    then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
+                    else return ()
                 GUI.connect host 5900 password
             widgetShowAll window
             mainGUI
-        _ -> putStrLn "Please specify the address of the host computer."
-
+    -- Otherwise continue with CLI
+        else do
+            case params of
+                [host] -> do
+                    if (verbose)
+                        then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
+                        else return ()
+                    CLI.connect host port
+                _ -> ioError (userError ("too many arguments\n" ++ usageInfo header options))
