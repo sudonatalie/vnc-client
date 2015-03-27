@@ -45,7 +45,7 @@ data Rectangle = Rectangle
 
 format = RFBFormat
 	{ encodingTypes = [0]
-	, bitsPerPixel = 32
+	, bitsPerPixel = 24
 	, depth = 24
 	, bigEndianFlag = 0
 	, trueColourFlag = 1
@@ -99,6 +99,25 @@ framebufferUpdateRequest sock incremental framebuffer =
 				   ++ intToBytes 2 (w framebuffer)
 				   ++ intToBytes 2 (h framebuffer))
 
+refreshWindow :: Socket -> Box -> Display -> Window -> GC -> Window -> GC -> Int -> Int  -> Int  -> IO ()
+refreshWindow _ _ _ _ _ _ _ _ _ 0 = return ()
+refreshWindow sock framebuffer display pixmap pixgc win gc w h n = do
+	framebufferUpdateRequest sock 1 framebuffer
+	--hold <- getLine
+	--readable <- isReadable sock
+	--if readable
+	--	then do
+	(a:b:n1:n2:_) <- recvInts sock 4
+	--putStrLn $ show a ++ ", " ++ show b ++  ", " ++ show (bytesToInt [n1, n2])
+	displayRectangles display pixmap pixgc sock (bytesToInt [n1, n2])
+	copyArea display pixmap win pixgc 0 0 (fromIntegral w) ( fromIntegral h) 0 0
+	refreshWindow sock framebuffer display pixmap pixgc win gc w h (n-1)
+	--	else do
+	--		putStrLn $ "Nothing"
+	--		refreshWindow sock framebuffer display pixmap pixgc win gc w h (n-1)
+
+	
+
 bytestringToInts :: B8.ByteString -> [Int]
 bytestringToInts = map ord . B8.unpack
 
@@ -133,20 +152,23 @@ displayRectangles display win gc sock n = do
 	 y1:y2:
 	 w1:w2:
 	 h1:h2:
+	 e1:e2:e3:e4:
 	 _) <- recvInts sock 12
 	let rect = Box { x = bytesToInt [x1, x2]
 				   , y = bytesToInt [y1, y2]
 				   , w = bytesToInt [w1, w2]
 				   , h = bytesToInt [h1, h2] }
-	recvAndDisplayPixels display win gc sock (x rect) (w rect) (h rect) (x rect) (y rect) (bitsPerPixel format)
+	--putStrLn $ show rect ++ ", encoding: " ++ show (bytesToInt [e1, e2, e3, e4])
+	recvAndDisplayPixels display win gc sock ((x rect)) (w rect) (h rect) (x rect ) (y rect ) (bitsPerPixel format)
 	displayRectangles display win gc sock (n-1)
 
+--TODO: needs cleaning up
 recvAndDisplayPixels :: Display -> Window -> GC -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 recvAndDisplayPixels _ _ _ _ _ _ 0 _ _ _ = return ()
 recvAndDisplayPixels display win gc sock x0 w h x y 24 = do
 	r:g:b:_ <- recvInts sock 3
 	displayPixel display win gc x y r g b
-	if ((x+1) >= w)
+	if ((x+1) >= x0+w)
 		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 24
 		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 24
 recvAndDisplayPixels display win gc sock x0 w h x y 32 = do
@@ -155,6 +177,18 @@ recvAndDisplayPixels display win gc sock x0 w h x y 32 = do
 	if ((x+1) >= w)
 		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 32
 		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 32
+recvAndDisplayPixels display win gc sock x0 w h x y 16= do
+	f:l:_ <- recvInts sock 2
+	displayPixel display win gc x y 0 f l
+	if ((x+1) >= w)
+		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 16
+		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 16
+recvAndDisplayPixels display win gc sock x0 w h x y 8 = do
+	byte:_ <- recvInts sock 1
+	displayPixel display win gc x y 0 0 byte
+	if ((x+1) >= w)
+		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 8
+		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 8
 recvAndDisplayPixels _ _ _ _ _ _ _ _ _ _ = return ()
 
 displayPixel :: Display -> Window -> GC -> Int -> Int -> Int -> Int -> Int -> IO ()

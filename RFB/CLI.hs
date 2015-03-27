@@ -75,9 +75,10 @@ connect host port = withSocketsDo $ do
 
 	let framebuffer = Box { x = 0
 						  , y = 0
-						  , w = bytesToInt [w1, w2]
-						  , h = bytesToInt [h1, h2] }
-
+						  , w = 640--bytesToInt [w1, w2]
+						  , h = 640--bytesToInt [h1, h2] 
+						  }
+ 
 	-- Get ServerName
 	serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
@@ -92,19 +93,28 @@ connect host port = withSocketsDo $ do
 
 	display <- openDisplay ""
 	rootw <- rootWindow display (defaultScreen display)
-	win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw 100 100 ((fromIntegral (w framebuffer))) (fromIntegral (h framebuffer))
+	win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw 640 0 ((fromIntegral (w framebuffer))) (fromIntegral (h framebuffer))
 	setTextProperty display win "VNC Client" wM_NAME
 	mapWindow display win
 	gc <- createGC display win
-
-	(_:_:n1:n2:_) <- recvInts sock 4
-
+	pixmap <- createPixmap display rootw (fromIntegral (w framebuffer)) (fromIntegral (h framebuffer)) (defaultDepthOfScreen (defaultScreenOfDisplay display))
+	pixgc <- createGC display pixmap
+	(a:b:n1:n2:_) <- recvInts sock 4
+	putStrLn $ show a ++ ", " ++ show b ++  ", " ++ show (bytesToInt [n1, n2])
 	--putStrLn "To open display window, press [Enter]..."
 	--hold <- getLine
 
 	--display screen image
-	displayRectangles display win gc sock (bytesToInt [n1, n2])	
+	displayRectangles display pixmap pixgc sock (bytesToInt [n1, n2])
+	--hold <- getLine
+	copyArea display pixmap win pixgc 0 0 (fromIntegral (w framebuffer)) (fromIntegral (h framebuffer)) 0 0
+	sync display False
+	--hold <- getLine
+	refreshWindow sock framebuffer display pixmap pixgc win gc ( (w framebuffer)) ( (h framebuffer)) 1000
+	freeGC display pixgc
 	freeGC display gc
+	freePixmap display pixmap
+	
 
 	putStrLn "To kill application, press [Enter]..."
 	hold <- getLine
@@ -115,3 +125,4 @@ connect host port = withSocketsDo $ do
 
 	-- Close socket
 	sClose sock
+
