@@ -84,7 +84,7 @@ connect host port password = withSocketsDo $ do
 	displayRectangles xWindow sock (bytesToInt [n1, n2])
 	swapBuffer xWindow
 	
-	refreshWindow sock framebuffer xWindow 1000
+	vncMainLoop sock framebuffer xWindow 1000
 
 	putStrLn "To kill application, press [Enter]..."
 	hold <- getLine

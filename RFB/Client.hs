@@ -91,9 +91,14 @@ vncMainLoop _ _ _ 0 = return ()
 vncMainLoop sock framebuffer xWindow n = do
 	framebufferUpdateRequest sock 1 framebuffer
 	--
+	message:_ <-recvInts sock 1
+	handleServerMessage message sock xWindow
 	--
 	vncMainLoop sock framebuffer xWindow (n-1)
 
+handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> IO ()
+handleServerMessage 0 sock xWindow = refreshWindow sock xWindow
+handleserverMessage _ _ _ = return ()
 
 
 mkUnmanagedWindow :: Display -> Screen -> Window -> Position -> Position -> Dimension -> Dimension -> IO Window
@@ -139,17 +144,11 @@ framebufferUpdateRequest sock incremental framebuffer =
 				   ++ intToBytes 2 (w framebuffer)
 				   ++ intToBytes 2 (h framebuffer))
 
-refreshWindow :: Socket -> Box -> VNCDisplayWindow -> Int  -> IO ()
-refreshWindow _ _ _ 0 = return ()
-refreshWindow sock framebuffer xWindow n = do
-	framebufferUpdateRequest sock 1 framebuffer
-	(a:b:n1:n2:_) <- recvInts sock 4
-	--putStrLn $ show a ++ ", " ++ show b ++  ", " ++ show (bytesToInt [n1, n2])
+refreshWindow :: Socket -> VNCDisplayWindow -> IO ()
+refreshWindow sock xWindow = do
+	(_:n1:n2:_) <- recvInts sock 3
 	displayRectangles xWindow sock (bytesToInt [n1, n2])
 	swapBuffer xWindow
-	refreshWindow sock framebuffer xWindow (n-1)
-
-	
 
 bytestringToInts :: B8.ByteString -> [Int]
 bytestringToInts = map ord . B8.unpack
@@ -195,12 +194,11 @@ displayRectangles xWindow sock n = do
 	recvAndDisplayPixels xWindow sock (bitsPerPixel format) (x rect) (w rect) (h rect) (x rect ) (y rect )
 	displayRectangles xWindow sock (n-1)
 
---TODO: needs cleaning up
 recvAndDisplayPixels :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 recvAndDisplayPixels _ _ _ _ _ 0 _ _ = return ()
 recvAndDisplayPixels xWindow sock bpp x0 w h x y = do
 	color <- recvColor sock bpp
-	displayPixel xWindow x y color--r g b
+	displayPixel xWindow x y color
 	if ((x+1) >= x0+w)
 		then recvAndDisplayPixels xWindow sock bpp x0 w (h-1) x0 (y+1)
 		else recvAndDisplayPixels xWindow sock bpp x0 w h (x+1) y
