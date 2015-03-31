@@ -31,13 +31,6 @@ data Box = Box
 	, h :: Int
 	} deriving (Show)
 
-{-data Pixel = Pixel
-	{ r :: Int
-	, g :: Int
-	, b :: Int
-	} deriving (Show)
--}
-
 data Rectangle = Rectangle
 	{ rectangle :: Box
 	, pixels :: [Pixel]
@@ -55,6 +48,53 @@ format = RFBFormat
 	, redShift = 0
 	, greenShift = 8
 	, blueShift =  16 }
+
+
+
+data VNCDisplayWindow = VNCDisplayWindow
+	{ display :: Display-- X display
+	, rootw :: Window 	-- root window
+	, win :: Window 	-- output window
+	, pixmap :: Pixmap 	-- image buffer
+	, wingc :: GC 		-- graphics contexts, might move them out of this module
+	, pixgc :: GC
+	, width :: Dimension
+	, height :: Dimension 
+	}
+
+createVNCDisplay :: Int -> Int -> Int -> Int -> IO VNCDisplayWindow
+createVNCDisplay x y w h = do
+	display <- openDisplay ""
+	rootw <- rootWindow display (defaultScreen display)
+	win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
+	setTextProperty display win "VNC Client" wM_NAME
+	mapWindow display win
+	gc <- createGC display win
+	pixmap <- createPixmap display rootw (fromIntegral w) (fromIntegral h) (defaultDepthOfScreen (defaultScreenOfDisplay display))
+	pixgc <- createGC display pixmap
+	let vncDisplay = VNCDisplayWindow { display = display
+									, rootw = rootw
+									, win = win
+									, pixmap = pixmap
+									, wingc = gc
+									, pixgc = pixgc
+									, width = (fromIntegral w)
+									, height = (fromIntegral h)
+									}
+	return vncDisplay
+
+swapBuffer :: VNCDisplayWindow -> IO ()
+swapBuffer xWindow = copyArea (display xWindow) (pixmap xWindow) (win xWindow) (pixgc xWindow) 0 0 (width xWindow) (height xWindow) 0 0
+
+vncMainLoop :: Socket -> Box -> VNCDisplayWindow -> Int -> IO ()
+vncMainLoop _ _ _ 0 = return ()
+vncMainLoop sock framebuffer xWindow n = do
+	framebufferUpdateRequest sock 1 framebuffer
+	--
+	--
+	vncMainLoop sock framebuffer xWindow (n-1)
+
+
 
 mkUnmanagedWindow :: Display -> Screen -> Window -> Position -> Position -> Dimension -> Dimension -> IO Window
 mkUnmanagedWindow d s rw x y w h = do
@@ -99,22 +139,15 @@ framebufferUpdateRequest sock incremental framebuffer =
 				   ++ intToBytes 2 (w framebuffer)
 				   ++ intToBytes 2 (h framebuffer))
 
-refreshWindow :: Socket -> Box -> Display -> Window -> GC -> Window -> GC -> Int -> Int  -> Int  -> IO ()
-refreshWindow _ _ _ _ _ _ _ _ _ 0 = return ()
-refreshWindow sock framebuffer display pixmap pixgc win gc w h n = do
+refreshWindow :: Socket -> Box -> VNCDisplayWindow -> Int  -> IO ()
+refreshWindow _ _ _ 0 = return ()
+refreshWindow sock framebuffer xWindow n = do
 	framebufferUpdateRequest sock 1 framebuffer
-	--hold <- getLine
-	--readable <- isReadable sock
-	--if readable
-	--	then do
 	(a:b:n1:n2:_) <- recvInts sock 4
 	--putStrLn $ show a ++ ", " ++ show b ++  ", " ++ show (bytesToInt [n1, n2])
-	displayRectangles display pixmap pixgc sock (bytesToInt [n1, n2])
-	copyArea display pixmap win pixgc 0 0 (fromIntegral w) ( fromIntegral h) 0 0
-	refreshWindow sock framebuffer display pixmap pixgc win gc w h (n-1)
-	--	else do
-	--		putStrLn $ "Nothing"
-	--		refreshWindow sock framebuffer display pixmap pixgc win gc w h (n-1)
+	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	swapBuffer xWindow
+	refreshWindow sock framebuffer xWindow (n-1)
 
 	
 
@@ -145,9 +178,9 @@ intToBytes 0 _ = []
 intToBytes l 0 = 0 : intToBytes (l-1) 0
 intToBytes l b = intToBytes (l-1) (shiftR (b .&. 0xFF00) 8) ++ [ b .&. 0xFF ]
 
-displayRectangles :: Display -> Window -> GC -> Socket -> Int -> IO ()
-displayRectangles _ _ _ _ 0 = return ()
-displayRectangles display win gc sock n = do
+displayRectangles :: VNCDisplayWindow -> Socket -> Int -> IO ()
+displayRectangles _ _ 0 = return ()
+displayRectangles xWindow sock n = do
 	(x1:x2:
 	 y1:y2:
 	 w1:w2:
@@ -159,39 +192,35 @@ displayRectangles display win gc sock n = do
 				   , w = bytesToInt [w1, w2]
 				   , h = bytesToInt [h1, h2] }
 	--putStrLn $ show rect ++ ", encoding: " ++ show (bytesToInt [e1, e2, e3, e4])
-	recvAndDisplayPixels display win gc sock ((x rect)) (w rect) (h rect) (x rect ) (y rect ) (bitsPerPixel format)
-	displayRectangles display win gc sock (n-1)
+	recvAndDisplayPixels xWindow sock (bitsPerPixel format) (x rect) (w rect) (h rect) (x rect ) (y rect )
+	displayRectangles xWindow sock (n-1)
 
 --TODO: needs cleaning up
-recvAndDisplayPixels :: Display -> Window -> GC -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-recvAndDisplayPixels _ _ _ _ _ _ 0 _ _ _ = return ()
-recvAndDisplayPixels display win gc sock x0 w h x y 24 = do
-	r:g:b:_ <- recvInts sock 3
-	displayPixel display win gc x y r g b
+recvAndDisplayPixels :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+recvAndDisplayPixels _ _ _ _ _ 0 _ _ = return ()
+recvAndDisplayPixels xWindow sock bpp x0 w h x y = do
+	color <- recvColor sock bpp
+	displayPixel xWindow x y color--r g b
 	if ((x+1) >= x0+w)
-		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 24
-		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 24
-recvAndDisplayPixels display win gc sock x0 w h x y 32 = do
-	r:g:b:_:_ <- recvInts sock 4
-	displayPixel display win gc x y r g b
-	if ((x+1) >= w)
-		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 32
-		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 32
-recvAndDisplayPixels display win gc sock x0 w h x y 16= do
-	f:l:_ <- recvInts sock 2
-	displayPixel display win gc x y 0 f l
-	if ((x+1) >= w)
-		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 16
-		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 16
-recvAndDisplayPixels display win gc sock x0 w h x y 8 = do
-	byte:_ <- recvInts sock 1
-	displayPixel display win gc x y 0 0 byte
-	if ((x+1) >= w)
-		then recvAndDisplayPixels display win gc sock x0 w (h-1) x0 (y+1) 8
-		else recvAndDisplayPixels display win gc sock x0 w h (x+1) y 8
-recvAndDisplayPixels _ _ _ _ _ _ _ _ _ _ = return ()
+		then recvAndDisplayPixels xWindow sock bpp x0 w (h-1) x0 (y+1)
+		else recvAndDisplayPixels xWindow sock bpp x0 w h (x+1) y
 
-displayPixel :: Display -> Window -> GC -> Int -> Int -> Int -> Int -> Int -> IO ()
-displayPixel display win gc x y r g b = do
-	setForeground display gc (fromIntegral (bytesToInt [r, g, b]))
-	drawPoint display win gc (fromIntegral x) (fromIntegral y)
+recvColor :: Socket -> Int -> IO Int
+recvColor sock 32 = do
+	r:g:b:_:_ <- recvInts sock 4
+	return (bytesToInt [r, g, b])
+recvColor sock 24 = do
+	r:g:b:_ <- recvInts sock 3
+	return (bytesToInt [r, g, b])
+recvColor sock 16 = do
+	f:l:_ <- recvInts sock 2
+	return (bytesToInt [f, l])
+recvColor sock 8 = do
+	color:_ <- recvInts sock 1
+	return color
+recvColor _ _ = return 0
+
+displayPixel :: VNCDisplayWindow -> Int -> Int -> Int -> IO ()
+displayPixel xWindow x y color = do
+	setForeground (display xWindow) (pixgc xWindow) (fromIntegral color)
+	drawPoint (display xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral x) (fromIntegral y)

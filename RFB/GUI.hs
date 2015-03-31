@@ -78,26 +78,22 @@ connect host port password = withSocketsDo $ do
 
 	framebufferUpdateRequest sock 0 framebuffer
 
-	display <- openDisplay ""
-	rootw <- rootWindow display (defaultScreen display)
-	win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw 100 100 ((fromIntegral (w framebuffer))) (fromIntegral (h framebuffer))
-	setTextProperty display win "VNC Client" wM_NAME
-	mapWindow display win
-	gc <- createGC display win
-
+	xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
+	
 	(_:_:n1:n2:_) <- recvInts sock 4
-
-	--putStrLn "To open display window, press [Enter]..."
-	--hold <- getLine
-
-	--display screen image
-	displayRectangles display win gc sock (bytesToInt [n1, n2])	
-	freeGC display gc
+	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	swapBuffer xWindow
+	
+	refreshWindow sock framebuffer xWindow 1000
 
 	putStrLn "To kill application, press [Enter]..."
 	hold <- getLine
 
-	sync display False
+	freeGC (display xWindow) (pixgc xWindow)
+	freeGC (display xWindow) (wingc xWindow)
+	freePixmap (display xWindow) (pixmap xWindow)
+
+	sync (display xWindow) False
 	threadDelay (1 * 1000000)
 	exitWith ExitSuccess
 

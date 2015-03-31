@@ -76,7 +76,7 @@ connect host port = withSocketsDo $ do
 	let framebuffer = Box { x = 0
 						  , y = 0
 						  , w = 640--bytesToInt [w1, w2]
-						  , h = 640--bytesToInt [h1, h2] 
+						  , h = 480--bytesToInt [h1, h2] 
 						  }
  
 	-- Get ServerName
@@ -91,35 +91,26 @@ connect host port = withSocketsDo $ do
 
 	framebufferUpdateRequest sock 0 framebuffer
 
-	display <- openDisplay ""
-	rootw <- rootWindow display (defaultScreen display)
-	win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw 640 0 ((fromIntegral (w framebuffer))) (fromIntegral (h framebuffer))
-	setTextProperty display win "VNC Client" wM_NAME
-	mapWindow display win
-	gc <- createGC display win
-	pixmap <- createPixmap display rootw (fromIntegral (w framebuffer)) (fromIntegral (h framebuffer)) (defaultDepthOfScreen (defaultScreenOfDisplay display))
-	pixgc <- createGC display pixmap
-	(a:b:n1:n2:_) <- recvInts sock 4
-	putStrLn $ show a ++ ", " ++ show b ++  ", " ++ show (bytesToInt [n1, n2])
+	xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
 	--putStrLn "To open display window, press [Enter]..."
 	--hold <- getLine
 
 	--display screen image
-	displayRectangles display pixmap pixgc sock (bytesToInt [n1, n2])
-	--hold <- getLine
-	copyArea display pixmap win pixgc 0 0 (fromIntegral (w framebuffer)) (fromIntegral (h framebuffer)) 0 0
-	sync display False
-	--hold <- getLine
-	refreshWindow sock framebuffer display pixmap pixgc win gc ( (w framebuffer)) ( (h framebuffer)) 1000
-	freeGC display pixgc
-	freeGC display gc
-	freePixmap display pixmap
+	(a:b:n1:n2:_) <- recvInts sock 4
+	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	swapBuffer xWindow
+
+	refreshWindow sock framebuffer xWindow 1000
+	
 	
 
 	putStrLn "To kill application, press [Enter]..."
 	hold <- getLine
+	freeGC (display xWindow) (pixgc xWindow)
+	freeGC (display xWindow) (wingc xWindow)
+	freePixmap (display xWindow) (pixmap xWindow)
 
-	sync display False
+	sync (display xWindow) False
 	threadDelay (1 * 1000000)
 	exitWith ExitSuccess
 
