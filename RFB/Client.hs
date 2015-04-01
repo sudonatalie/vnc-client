@@ -6,6 +6,7 @@ import qualified Data.ByteString.Char8 as B8
 import Data.Char (ord, chr)
 import Data.Bits
 
+--import Graphics.UI.Gtk.General.Clipboard
 import Graphics.X11.Xlib
 import System.Exit (exitWith, ExitCode(..))
 import Control.Concurrent (threadDelay)
@@ -37,7 +38,7 @@ data Rectangle = Rectangle
 	}
 
 format = RFBFormat
-	{ encodingTypes = [0]
+	{ encodingTypes = [1, 0] --in order of priority
 	, bitsPerPixel = 24
 	, depth = 24
 	, bigEndianFlag = 0
@@ -98,7 +99,19 @@ vncMainLoop sock framebuffer xWindow n = do
 
 handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> IO ()
 handleServerMessage 0 sock xWindow = refreshWindow sock xWindow
+handleServerMessage 2 _ _ = putStr "\a"
+handleServerMessage 3 sock _ = return ()--updateClipboard sock
 handleserverMessage _ _ _ = return ()
+
+--incomplete, does not copy to clipboard
+--updateClipboard :: Socket -> IO ()
+--updateClipboard sock = do
+	--_:_:_:l1:l2:l3:l4:_ <- recvInts sock 7
+	--stringLength = bytesToInt ([l1, l2, l3, l4])
+	--clipboardString <- recvString sock (bytesToInt [l1, l2, l3, l4])
+	--clipboardObj <- clipboardGet selectionClipboard
+	--clipboardSetText clipboardObj clipboardString
+
 
 
 mkUnmanagedWindow :: Display -> Screen -> Window -> Position -> Position -> Dimension -> Dimension -> IO Window
@@ -147,7 +160,7 @@ framebufferUpdateRequest sock incremental framebuffer =
 refreshWindow :: Socket -> VNCDisplayWindow -> IO ()
 refreshWindow sock xWindow = do
 	(_:n1:n2:_) <- recvInts sock 3
-	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
 	swapBuffer xWindow
 
 bytestringToInts :: B8.ByteString -> [Int]
@@ -177,9 +190,9 @@ intToBytes 0 _ = []
 intToBytes l 0 = 0 : intToBytes (l-1) 0
 intToBytes l b = intToBytes (l-1) (shiftR (b .&. 0xFF00) 8) ++ [ b .&. 0xFF ]
 
-displayRectangles :: VNCDisplayWindow -> Socket -> Int -> IO ()
-displayRectangles _ _ 0 = return ()
-displayRectangles xWindow sock n = do
+handleRectangleHeader :: VNCDisplayWindow -> Socket -> Int -> IO ()
+handleRectangleHeader _ _ 0 = return ()
+handleRectangleHeader xWindow sock n = do
 	(x1:x2:
 	 y1:y2:
 	 w1:w2:
@@ -190,18 +203,30 @@ displayRectangles xWindow sock n = do
 				   , y = bytesToInt [y1, y2]
 				   , w = bytesToInt [w1, w2]
 				   , h = bytesToInt [h1, h2] }
-	--putStrLn $ show rect ++ ", encoding: " ++ show (bytesToInt [e1, e2, e3, e4])
-	recvAndDisplayPixels xWindow sock (bitsPerPixel format) (x rect) (w rect) (h rect) (x rect ) (y rect )
-	displayRectangles xWindow sock (n-1)
+	--encoding = (bytesToInt [e1, e2, e3, e4])
+	displayRectangle (bytesToInt [e1, e2, e3, e4]) xWindow sock (bitsPerPixel format) (x rect) (y rect ) (w rect) (h rect)
+	--decodeRAW xWindow sock (bitsPerPixel format) (x rect) (w rect) (h rect) (x rect ) (y rect )
+	handleRectangleHeader xWindow sock (n-1)
 
-recvAndDisplayPixels :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-recvAndDisplayPixels _ _ _ _ _ 0 _ _ = return ()
-recvAndDisplayPixels xWindow sock bpp x0 w h x y = do
+displayRectangle :: Int -> VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> IO ()
+displayRectangle 0 xWindow sock bpp x y w h = decodeRAW xWindow sock bpp x w h x y
+displayRectangle 1 xWindow sock bpp x y w h = decodeCopyRect xWindow sock x y w h
+displayRectangle _ _ _ _ _ _ _ _ = return ()
+
+decodeRAW :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+decodeRAW _ _ _ _ _ 0 _ _ = return ()
+decodeRAW xWindow sock bpp x0 w h x y = do
 	color <- recvColor sock bpp
 	displayPixel xWindow x y color
 	if ((x+1) >= x0+w)
-		then recvAndDisplayPixels xWindow sock bpp x0 w (h-1) x0 (y+1)
-		else recvAndDisplayPixels xWindow sock bpp x0 w h (x+1) y
+		then decodeRAW xWindow sock bpp x0 w (h-1) x0 (y+1)
+		else decodeRAW xWindow sock bpp x0 w h (x+1) y
+
+decodeCopyRect :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> IO ()
+decodeCopyRect xWindow sock x y w h = do
+	srcx1:srcx2:srcy1:srcy2:_ <- recvInts sock 4
+	copyArea (display xWindow) (pixmap xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral (bytesToInt [srcx1, srcx2])) (fromIntegral (bytesToInt [srcy1, srcy2])) (fromIntegral w) (fromIntegral h) (fromIntegral x) (fromIntegral y)
+
 
 recvColor :: Socket -> Int -> IO Int
 recvColor sock 32 = do

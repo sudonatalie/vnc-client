@@ -81,7 +81,7 @@ connect host port password = withSocketsDo $ do
 	xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
 	
 	(_:_:n1:n2:_) <- recvInts sock 4
-	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
 	swapBuffer xWindow
 	
 	vncMainLoop sock framebuffer xWindow 1000

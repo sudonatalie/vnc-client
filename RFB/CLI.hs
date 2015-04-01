@@ -4,7 +4,7 @@ import RFB.Client
 import RFB.Security
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString (send, recv)
-
+--import Graphics.UI.Gtk.General.Clipboard
 import Graphics.X11.Xlib
 import System.Exit (exitWith, ExitCode(..))
 import Control.Concurrent (threadDelay)
@@ -76,7 +76,7 @@ connect host port = withSocketsDo $ do
 	let framebuffer = Box { x = 0
 						  , y = 0
 						  , w = 640--bytesToInt [w1, w2]
-						  , h = 480--bytesToInt [h1, h2] 
+						  , h = 640--bytesToInt [h1, h2] 
 						  }
  
 	-- Get ServerName
@@ -97,9 +97,10 @@ connect host port = withSocketsDo $ do
 
 	--display screen image
 	(a:b:n1:n2:_) <- recvInts sock 4
-	displayRectangles xWindow sock (bytesToInt [n1, n2])
+	handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
 	swapBuffer xWindow
-
+	--clipboardObj <- clipboardGet selectionPrimary
+	--clipboardSetText clipboardObj "hello!"
 	vncMainLoop sock framebuffer xWindow 1000
 	
 	
