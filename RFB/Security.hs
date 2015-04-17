@@ -8,9 +8,8 @@ import Data.Char (ord)
 
 desEncryption :: [Int] -> [[Int]] -> [Int]
 desEncryption xs subkeys = desEncryptionIter subkeys left right 0
-        where left = firstHalf xip
-              right = lastHalf xip
-              xip = initPermutation xs
+        where (left, right) = splitAt (div (length xip) 2) xip
+              xip = initPermutation xs 
 
 -- l15 = r14
 -- r15 = xorTuple (zip l14 (feistel r14 14 subkeys))     
@@ -107,8 +106,7 @@ getSubkeysIter subkeys left right n
 
 getSubkeys :: String -> [[Int]]
 getSubkeys mykey = getSubkeysIter [] [left0] [right0] 0
-        where left0 = firstHalf pc1
-              right0 = lastHalf pc1 
+        where (left0, right0) = splitAt (div (length pc1) 2) pc1
               pc1 = (permutedChoice1 . preProcess) mykey
 
 -- Other functions
@@ -130,20 +128,12 @@ permutation xs (i:indextable)
         | i+1 > length xs = 0 :  permutation xs indextable -- error case
         | otherwise = (xs !! i) : permutation xs indextable
 
--- Get half list
-firstHalf :: [Int] -> [Int]
-firstHalf [] = []
-firstHalf xs = take (div (length xs) 2) xs
-
-lastHalf :: [Int] -> [Int]
-lastHalf [] = []
-lastHalf xs = drop (div (length xs) 2) xs
-
 -- split a list into pieces with length n(may not be n for last piece)
 splitEvery :: Int -> [Int] -> [[Int]]
 splitEvery n xs
                 | n >= length xs = [xs]
-                | otherwise = take n xs : splitEvery n (drop n xs) 
+                | otherwise = firstn : splitEvery n remains
+                where (firstn, remains) = splitAt n xs 
 
 -- Convert char to binary (8-bit list)
 charToBits :: Char -> [Int]
@@ -174,7 +164,8 @@ localB2D [] = 0
 localB2D (x:xs) = x + 2 * localB2D xs
 
 rotateLeft :: [Int] -> Int -> [Int]
-rotateLeft bitlist n = drop n bitlist ++ take n bitlist
+rotateLeft bitlist n = last ++ first
+        where (first, last) = splitAt n bitlist
 
 xorTuple :: [(Int, Int)] -> [Int]
 xorTuple [] = []

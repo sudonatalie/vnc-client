@@ -42,8 +42,9 @@ connect host port password = withSocketsDo $ do
 	let subkeys = getSubkeys password
 
 	-- challenge = [125,102,186,0,253,221,4,64,154,249,213,155,187,61,189,28]
-	let cha1 = concatMap decToBin8 (firstHalf challenge)
-	let cha2 = concatMap decToBin8 (lastHalf challenge)
+	let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
+	let cha1 = concatMap decToBin8 firstHalf
+	let cha2 = concatMap decToBin8 lastHalf
 		
 	let res1 = desEncryption cha1 subkeys
 	let res2 = desEncryption cha2 subkeys
