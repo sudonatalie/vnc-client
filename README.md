@@ -26,3 +26,11 @@ GTK on Ubuntu:
 4. `sudo cabal install gtk2hs-buildtools --global`
 5. `sudo apt-get install libglade2-dev`
 6. `sudo cabal install glade --global`
+
+Documentation
+-------------
+
+Source code documentation can be generated from the literate source files with:
+
+1. lhs2TeX doc.lhs > doc.tex
+2. pdflatex doc.tex
