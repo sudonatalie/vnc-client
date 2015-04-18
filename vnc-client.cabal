@@ -16,7 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.18
 
 executable vnc-client
-  main-is:             Main.hs
+  main-is:             Main.lhs
   other-modules:       RFB.Client
   -- other-extensions:    
   build-depends:       base >=4.6, network >= 2.4, bytestring >= 0.1, X11 >= 1.6, gtk <= 0.13, glade <= 0.13
