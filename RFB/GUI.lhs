@@ -14,36 +14,42 @@
 > connect :: String -> Int -> String -> IO()
 > connect host port password = withSocketsDo $ do
 
-> 	-- Connect to server via socket
+Connect to server via socket
+
 > 	addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
 > 	let serverAddr = head addrInfo
 > 	sock <- socket (addrFamily serverAddr) Stream defaultProtocol
 > 	Network.Socket.connect sock (addrAddress serverAddr)
 
-> 	-- Check for VNC server
+Check for VNC server
+
 > 	sendInts sock []
 > 	msg <- recvString sock 12
-> 	-- TODO Verify version format
 
-> 	-- TODO Actually compare version numbers before blindy choosing
+Choose version number
+
 > 	let version = "RFB 003.007\n"
 > 	sendString sock version
 
-> 	-- Receive number of security types
+Receive number of security types
+
 > 	(numberOfSecurityTypes:_) <- recvInts sock 1
 
-> 	-- Receive security types
+Receive security types
+
 > 	securityTypes <- recvInts sock numberOfSecurityTypes
 
-> 	-- TODO Actually check security types before blindy choosing
+Choose security type
+
 > 	sendInts sock [2]
-> 	
-> 	-- Reveive 16 bytes challenge
+
+Receive 16 bytes challenge
+
 > 	challenge <- recvInts sock 16
 
-> 	let subkeys = getSubkeys password
+Hash password with cypher
 
-> 	-- challenge = [125,102,186,0,253,221,4,64,154,249,213,155,187,61,189,28]
+> 	let subkeys = getSubkeys password
 > 	let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
 > 	let cha1 = concatMap decToBin8 firstHalf
 > 	let cha2 = concatMap decToBin8 lastHalf
@@ -51,17 +57,21 @@
 > 	let res1 = desEncryption cha1 subkeys
 > 	let res2 = desEncryption cha2 subkeys
 > 	let cyphertext = res1 ++ res2
-> 	
-> 	-- send back encrypted challenge
+
+Send back encrypted challenge
+
 > 	sendInts sock cyphertext
-> 	
-> 	-- receive security result. type: U32.
+
+Receive security result. type: U32.
+
 > 	msgRes <- recv sock 4
 
-> 	-- Allow shared desktop
+Allow shared desktop
+
 > 	sendInts sock [1]
 
-> 	-- Get ServerInit message
+Get server initialisation message
+
 > 	(w1:w2:
 > 	 h1:h2:
 > 	 _:_:_:_:_:_:_:_:_:_:_:_:_:_:_:_: -- server-pixel-format
@@ -73,7 +83,8 @@
 > 						  , w = bytesToInt [w1, w2]
 > 						  , h = bytesToInt [h1, h2] }
 
-> 	-- Get ServerName
+Get server name
+
 > 	serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
 > 	setEncodings sock format
@@ -100,5 +111,6 @@
 > 	threadDelay (1 * 1000000)
 > 	exitWith ExitSuccess
 
-> 	-- Close socket
+Close socket
+
 > 	sClose sock
