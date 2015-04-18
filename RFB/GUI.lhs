@@ -1,7 +1,4 @@
-\documentclass{article}
-%include lhs2TeX.fmt
-%include lhs2TeX.sty
-\begin{document}
+\section{GUI.lhs}
 
 > module RFB.GUI where
 
@@ -105,5 +102,3 @@
 
 > 	-- Close socket
 > 	sClose sock
-
-\end{document}

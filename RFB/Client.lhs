@@ -1,7 +1,4 @@
-\documentclass{article}
-%include lhs2TeX.fmt
-%include lhs2TeX.sty
-\begin{document}
+\section{Client.lhs}
 
 > module RFB.Client where
 
@@ -254,5 +251,3 @@ updateClipboard sock = do
 > displayPixel xWindow x y color = do
 > 	setForeground (display xWindow) (pixgc xWindow) (fromIntegral color)
 > 	drawPoint (display xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral x) (fromIntegral y)
-
-\end{document}

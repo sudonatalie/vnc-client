@@ -1,7 +1,4 @@
-\documentclass{article}
-%include lhs2TeX.fmt
-%include lhs2TeX.sty
-\begin{document}
+\section{Security.lhs}
 
 > module RFB.Security where
 
@@ -257,5 +254,3 @@ Generates left shift table
 
 > ls :: [Int]
 > ls = [1,1,2,2,2,2,2,2,1,2,2,2,2,2,2,1]
-
-\end{document}

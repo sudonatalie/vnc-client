@@ -1,7 +1,4 @@
-\documentclass{article}
-%include lhs2TeX.fmt
-%include lhs2TeX.sty
-\begin{document}
+\section{CLI.lhs}
 
 > module RFB.CLI where
 
@@ -138,5 +135,3 @@
 > withEcho echo action = do
 >   old <- hGetEcho stdin
 >   bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
-
-\end{document}
