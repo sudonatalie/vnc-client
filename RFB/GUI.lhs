@@ -16,101 +16,101 @@
 
 Connect to server via socket
 
-> 	addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
-> 	let serverAddr = head addrInfo
-> 	sock <- socket (addrFamily serverAddr) Stream defaultProtocol
-> 	Network.Socket.connect sock (addrAddress serverAddr)
+>     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
+>     let serverAddr = head addrInfo
+>     sock <- socket (addrFamily serverAddr) Stream defaultProtocol
+>     Network.Socket.connect sock (addrAddress serverAddr)
 
 Check for VNC server
 
-> 	sendInts sock []
-> 	msg <- recvString sock 12
+>     sendInts sock []
+>     msg <- recvString sock 12
 
 Choose version number
 
-> 	let version = "RFB 003.007\n"
-> 	sendString sock version
+>     let version = "RFB 003.007\n"
+>     sendString sock version
 
 Receive number of security types
 
-> 	(numberOfSecurityTypes:_) <- recvInts sock 1
+>     (numberOfSecurityTypes:_) <- recvInts sock 1
 
 Receive security types
 
-> 	securityTypes <- recvInts sock numberOfSecurityTypes
+>     securityTypes <- recvInts sock numberOfSecurityTypes
 
 Choose security type
 
-> 	sendInts sock [2]
+>     sendInts sock [2]
 
 Receive 16 bytes challenge
 
-> 	challenge <- recvInts sock 16
+>     challenge <- recvInts sock 16
 
 Hash password with cypher
 
-> 	let subkeys = getSubkeys password
-> 	let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
-> 	let cha1 = concatMap decToBin8 firstHalf
-> 	let cha2 = concatMap decToBin8 lastHalf
-> 		
-> 	let res1 = desEncryption cha1 subkeys
-> 	let res2 = desEncryption cha2 subkeys
-> 	let cyphertext = res1 ++ res2
+>     let subkeys = getSubkeys password
+>     let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
+>     let cha1 = concatMap decToBin8 firstHalf
+>     let cha2 = concatMap decToBin8 lastHalf
+>         
+>     let res1 = desEncryption cha1 subkeys
+>     let res2 = desEncryption cha2 subkeys
+>     let cyphertext = res1 ++ res2
 
 Send back encrypted challenge
 
-> 	sendInts sock cyphertext
+>     sendInts sock cyphertext
 
 Receive security result. type: U32.
 
-> 	msgRes <- recv sock 4
+>     msgRes <- recv sock 4
 
 Allow shared desktop
 
-> 	sendInts sock [1]
+>     sendInts sock [1]
 
 Get server initialisation message
 
-> 	(w1:w2:
-> 	 h1:h2:
-> 	 _:_:_:_:_:_:_:_:_:_:_:_:_:_:_:_: -- server-pixel-format
-> 	 l1:l2:l3:l4:
-> 	 _) <- recvInts sock 24
+>     (w1:w2:
+>      h1:h2:
+>      _:_:_:_:_:_:_:_:_:_:_:_:_:_:_:_: -- server-pixel-format
+>      l1:l2:l3:l4:
+>      _) <- recvInts sock 24
 
-> 	let framebuffer = Box { x = 0
-> 						  , y = 0
-> 						  , w = bytesToInt [w1, w2]
-> 						  , h = bytesToInt [h1, h2] }
+>     let framebuffer = Box { x = 0
+>                           , y = 0
+>                           , w = bytesToInt [w1, w2]
+>                           , h = bytesToInt [h1, h2] }
 
 Get server name
 
-> 	serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
+>     serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
-> 	setEncodings sock format
-> 	setPixelFormat sock format
+>     setEncodings sock format
+>     setPixelFormat sock format
 
-> 	framebufferUpdateRequest sock 0 framebuffer
+>     framebufferUpdateRequest sock 0 framebuffer
 
-> 	xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
-> 	
-> 	(_:_:n1:n2:_) <- recvInts sock 4
-> 	handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
-> 	swapBuffer xWindow
-> 	
-> 	vncMainLoop sock framebuffer xWindow 1000
+>     xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
+>     
+>     (_:_:n1:n2:_) <- recvInts sock 4
+>     handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
+>     swapBuffer xWindow
+>     
+>     vncMainLoop sock framebuffer xWindow 1000
 
-> 	putStrLn "To kill application, press [Enter]..."
-> 	hold <- getLine
+>     putStrLn "To kill application, press [Enter]..."
+>     hold <- getLine
 
-> 	freeGC (display xWindow) (pixgc xWindow)
-> 	freeGC (display xWindow) (wingc xWindow)
-> 	freePixmap (display xWindow) (pixmap xWindow)
+>     freeGC (display xWindow) (pixgc xWindow)
+>     freeGC (display xWindow) (wingc xWindow)
+>     freePixmap (display xWindow) (pixmap xWindow)
 
-> 	sync (display xWindow) False
-> 	threadDelay (1 * 1000000)
-> 	exitWith ExitSuccess
+>     sync (display xWindow) False
+>     threadDelay (1 * 1000000)
+>     exitWith ExitSuccess
 
 Close socket
 
-> 	sClose sock
+>     sClose sock
