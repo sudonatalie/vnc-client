@@ -1,3 +1,8 @@
+\documentclass{article}
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+\begin{document}
+
 > module RFB.Client where
 
 > import Network.Socket hiding (send, recv)
@@ -249,3 +254,5 @@ updateClipboard sock = do
 > displayPixel xWindow x y color = do
 > 	setForeground (display xWindow) (pixgc xWindow) (fromIntegral color)
 > 	drawPoint (display xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral x) (fromIntegral y)
+
+\end{document}

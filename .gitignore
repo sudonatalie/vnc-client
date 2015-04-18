@@ -1,6 +1,15 @@
+# Executable
 vnc-client
 
+# Sandbox
 dist
 .cabal-sandbox/
 cabal.sandbox.config
+
+# lhs2TeX
+*.tex
+*.log
+*.aux
+*.pdf
+*.ptb
 

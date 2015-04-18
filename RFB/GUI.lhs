@@ -1,3 +1,8 @@
+\documentclass{article}
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+\begin{document}
+
 > module RFB.GUI where
 
 > import RFB.Client
@@ -100,3 +105,5 @@
 
 > 	-- Close socket
 > 	sClose sock
+
+\end{document}

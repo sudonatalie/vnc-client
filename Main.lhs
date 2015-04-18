@@ -1,3 +1,8 @@
+\documentclass{article}
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+\begin{document}
+
 > import System.Environment (getArgs)
 > import System.Console.GetOpt
 > import Graphics.UI.Gtk
@@ -93,3 +98,5 @@ Option descriptions
 >                                 else return ()
 >                             CLI.connect host port
 >                         _ -> ioError (userError ("too many arguments\n" ++ usageInfo header options))
+
+\end{document}
