@@ -15,7 +15,9 @@ The command line options currently supported are:
 \item help
 \item verbose
 \item graphical user interface
-\item port
+\item authentication type (None or VNC)
+\item port number
+\item top, left, width and height of frame
 \end{enumerate}
 
 \subsubsection{Defaults}
@@ -107,10 +109,15 @@ If the help option is specified, then the following descriptive message is displ
 \begin{verbatim}
 ~ $ vnc-client --help
 Usage: vnc-client [OPTION...] host
-  -h       --help       print usage instructions
-  -v       --verbose    verbose mode for more information output
-  -g       --gui        configure client via graphical UI
-  -p PORT  --port=PORT  port number (default: 5900)
+  -?         --help           print usage instructions
+  -v         --verbose        verbose mode for more information output
+  -g         --gui            configure client via graphical UI
+  -n         --no-auth        connect without authentication (default: VNC password authentication)
+  -p PORT    --port=PORT      port number (default: 5900)
+  -t TOP     --top=TOP        top position (default: 0)
+  -l LEFT    --left=LEFT      left position (default: 0)
+  -w WIDTH   --width=WIDTH    width (default: entire framebuffer)
+  -h HEIGHT  --height=HEIGHT  height (default: entire framebuffer)
 \end{verbatim}
 
 \subsubsection{GUI}
