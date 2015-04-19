@@ -47,5 +47,5 @@ Documentation
 
 Source code documentation can be generated from the literate source files with:
 
-1. lhs2TeX doc.lhs > doc.tex
-2. pdflatex doc.tex
+1. `lhs2TeX doc.lhs > doc.tex`
+2. `pdflatex doc.tex`
