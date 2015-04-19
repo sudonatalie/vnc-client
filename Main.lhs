@@ -4,6 +4,7 @@
 > import System.Console.GetOpt
 > import Graphics.UI.Gtk
 > import Graphics.UI.Gtk.Glade
+> import Data
 > import RFB.GUI as GUI
 > import RFB.CLI as CLI
 
@@ -17,13 +18,6 @@ The command line options currently supported are:
 \item port
 \end{enumerate}
 
-> data Options =  Options
->                 { optHelp :: Bool
->                 , optVerbose :: Bool
->                 , optGraphical :: Bool
->                 , optPort :: Int
->                 } deriving Show
-
 \subsubsection{Defaults}
 
 Each option has a default value.
@@ -33,6 +27,10 @@ Each option has a default value.
 >                   , optVerbose = False
 >                   , optGraphical = False
 >                   , optPort = 5900
+>                   , optTop = 0
+>                   , optLeft = 0
+>                   , optWidth = Nothing
+>                   , optHeight = Nothing
 >                   }
 
 \subsubsection{Option Descriptions}
@@ -42,7 +40,7 @@ The following option descriptions are used for \texttt{--help}.
 > header = "Usage: vnc-client [OPTION...] host"
 
 > options :: [OptDescr (Options -> Options)]
-> options =  [ Option ['h'] ["help"]
+> options =  [ Option ['?'] ["help"]
 >                (NoArg (\ opts -> opts { optHelp = True }))
 >                "print usage instructions"
 >            , Option ['v'] ["verbose"]
@@ -54,6 +52,18 @@ The following option descriptions are used for \texttt{--help}.
 >            , Option ['p'] ["port"]
 >                (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")
 >                "port number (default: 5900)"
+>            , Option ['t'] ["top"]
+>                (ReqArg (\ t opts -> opts { optTop = read t :: Int }) "TOP")
+>                "top position (default: 0)"
+>            , Option ['l'] ["left"]
+>                (ReqArg (\ l opts -> opts { optLeft = read l :: Int }) "LEFT")
+>                "left position (default: 0)"
+>            , Option ['w'] ["width"]
+>                (ReqArg (\ w opts -> opts { optWidth = Just (read w :: Int) }) "WIDTH")
+>                "width (default: entire framebuffer)"
+>            , Option ['h'] ["height"]
+>                (ReqArg (\ h opts -> opts { optHeight = Just (read h :: Int) }) "HEIGHT")
+>                "height (default: entire framebuffer)"
 >            ]
 
 > parseOpts :: [String] -> IO (Options, [String])
@@ -71,10 +81,14 @@ The following option descriptions are used for \texttt{--help}.
 First, get and parse the command line arguments as options.
 
 >     args <- getArgs
->     (Options  { optHelp       = help
->               , optVerbose    = verbose
->               , optGraphical  = gui
->               , optPort       = port }
+>     (opts@Options  { optHelp       = help
+>                    , optVerbose    = verbose
+>                    , optGraphical  = gui
+>                    , optPort       = port
+>                    , optTop        = top
+>                    , optLeft       = left
+>                    , optWidth      = width
+>                    , optHeight     = height }
 >         , params) <- parseOpts args
 
 \subsubsection{Help}
@@ -116,7 +130,7 @@ Launch the GUI if it is specifically requested, or if the hostname is unspecifie
 >                     if (verbose)
 >                         then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
 >                         else return ()
->                     GUI.connect host 5900 password
+>                     GUI.connect host opts password
 >                 widgetShowAll window
 >                 mainGUI
 
@@ -130,5 +144,5 @@ Launch the CLI otherwise.
 >                     if (verbose)
 >                         then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
 >                         else return ()
->                     CLI.connect host port
+>                     CLI.connect host opts
 >                 _       -> ioError (userError ("too many arguments\n" ++ usageInfo header options))

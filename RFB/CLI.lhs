@@ -2,6 +2,7 @@
 
 > module RFB.CLI where
 
+> import Data
 > import RFB.Client
 > import RFB.Security
 > import Network.Socket hiding (send, recv)
@@ -14,8 +15,16 @@
 
 \subsection{connect function}
 
-> connect :: String -> Int -> IO()
-> connect host port = withSocketsDo $ do
+> connect :: String -> Options -> IO()
+> connect host Options  { optHelp       = _
+>                       , optVerbose    = verbose
+>                       , optGraphical  = _
+>                       , optPort       = port
+>                       , optTop        = top
+>                       , optLeft       = left
+>                       , optWidth      = width
+>                       , optHeight     = height }
+>     = withSocketsDo $ do
 
 Connect to server via socket
 

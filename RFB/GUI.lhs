@@ -2,6 +2,7 @@
 
 > module RFB.GUI where
 
+> import Data
 > import RFB.Client
 > import RFB.Security
 > import Network.Socket hiding (send, recv)
@@ -11,8 +12,16 @@
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
 
-> connect :: String -> Int -> String -> IO()
-> connect host port password = withSocketsDo $ do
+> connect :: String -> Options -> String -> IO()
+> connect host Options  { optHelp       = _
+>                       , optVerbose    = _
+>                       , optGraphical  = _
+>                       , optPort       = port
+>                       , optTop        = top
+>                       , optLeft       = left
+>                       , optWidth      = width
+>                       , optHeight     = height }
+>     password = withSocketsDo $ do
 
 Connect to server via socket
 
