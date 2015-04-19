@@ -6,6 +6,21 @@ Installation
 
     cabal install
 
+Usage
+-----
+
+    ~ $ vnc-client --help
+    Usage: vnc-client [OPTION...] host
+      -?         --help           print usage instructions
+      -v         --verbose        verbose mode for more information output
+      -g         --gui            configure client via graphical UI
+      -n         --no-auth        connect without authentication (default: VNC password authentication)
+      -p PORT    --port=PORT      port number (default: 5900)
+      -t TOP     --top=TOP        top position (default: 0)
+      -l LEFT    --left=LEFT      left position (default: 0)
+      -w WIDTH   --width=WIDTH    width (default: entire framebuffer)
+      -h HEIGHT  --height=HEIGHT  height (default: entire framebuffer)
+
 Troubleshooting
 ---------------
 
