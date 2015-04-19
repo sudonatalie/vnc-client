@@ -26,6 +26,7 @@ Each option has a default value.
 >                   { optHelp = False
 >                   , optVerbose = False
 >                   , optGraphical = False
+>                   , optNoAuth = False
 >                   , optPort = 5900
 >                   , optTop = 0
 >                   , optLeft = 0
@@ -49,6 +50,9 @@ The following option descriptions are used for \texttt{--help}.
 >            , Option ['g'] ["gui"]
 >                (NoArg (\ opts -> opts { optGraphical = True }))
 >                "configure client via graphical UI"
+>            , Option ['n'] ["no-auth"]
+>                (NoArg (\ opts -> opts { optNoAuth = True }))
+>                "connect without authentication (default: VNC password authentication)"
 >            , Option ['p'] ["port"]
 >                (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")
 >                "port number (default: 5900)"
@@ -84,6 +88,7 @@ First, get and parse the command line arguments as options.
 >     (opts@Options  { optHelp       = help
 >                    , optVerbose    = verbose
 >                    , optGraphical  = gui
+>                    , optNoAuth     = noAuth
 >                    , optPort       = port
 >                    , optTop        = top
 >                    , optLeft       = left

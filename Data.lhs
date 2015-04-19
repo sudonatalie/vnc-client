@@ -6,6 +6,7 @@
 >                 { optHelp :: Bool
 >                 , optVerbose :: Bool
 >                 , optGraphical :: Bool
+>                 , optNoAuth :: Bool
 >                 , optPort :: Int
 >                 , optTop :: Int
 >                 , optLeft :: Int

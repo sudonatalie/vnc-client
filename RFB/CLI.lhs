@@ -19,6 +19,7 @@
 > connect host Options  { optHelp       = _
 >                       , optVerbose    = verbose
 >                       , optGraphical  = _
+>                       , optNoAuth     = noAuth
 >                       , optPort       = port
 >                       , optTop        = top
 >                       , optLeft       = left
@@ -58,35 +59,41 @@ Receive security types
 
 Choose security type
 
->     sendInts sock [2]
+>     if (noAuth)
+>       then do
+>         sendInts sock [1]
+>         return ()
+>       else do
+>         sendInts sock [2]
 
 Reveive 16 byte challenge
 
->     challenge <- recvInts sock 16
+>         challenge <- recvInts sock 16
 
 Get password from user
 
->     password <- getPassword
+>         password <- getPassword
 
 Hash password with cypher
 
->     let subkeys = getSubkeys password
+>         let subkeys = getSubkeys password
 
->     let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
->     let cha1 = concatMap decToBin8 firstHalf
->     let cha2 = concatMap decToBin8 lastHalf
->             
->     let res1 = desEncryption cha1 subkeys
->     let res2 = desEncryption cha2 subkeys
->     let cyphertext = res1 ++ res2
+>         let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
+>         let cha1 = concatMap decToBin8 firstHalf
+>         let cha2 = concatMap decToBin8 lastHalf
+>                 
+>         let res1 = desEncryption cha1 subkeys
+>         let res2 = desEncryption cha2 subkeys
+>         let cyphertext = res1 ++ res2
 
 Send back encrypted challenge
 
->     sendInts sock cyphertext
+>         sendInts sock cyphertext
 
 Receive security result. type: U32.
 
->     msgRes <- recv sock 4
+>         msgRes <- recv sock 4
+>         return ()
 
 Allow shared desktop
 
