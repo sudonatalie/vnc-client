@@ -127,9 +127,6 @@ Launch the GUI if it is specifically requested, or if the hostname is unspecifie
 >                 onClicked connectButton $ do
 >                     host <- get entry entryText
 >                     password <- get passwordBox entryText
->                     if (verbose)
->                         then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
->                         else return ()
 >                     GUI.connect host opts password
 >                 widgetShowAll window
 >                 mainGUI
@@ -140,9 +137,5 @@ Launch the CLI otherwise.
 
 >         else do
 >             case params of
->                 [host]  -> do
->                     if (verbose)
->                         then putStrLn ("Connecting to " ++ host ++ ":" ++ show port ++ "...")
->                         else return ()
->                     CLI.connect host opts
+>                 [host]  -> CLI.connect host opts
 >                 _       -> ioError (userError ("too many arguments\n" ++ usageInfo header options))

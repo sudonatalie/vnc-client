@@ -28,6 +28,8 @@
 
 Connect to server via socket
 
+>     status verbose $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
+
 >     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
 >     let serverAddr = head addrInfo
 >     sock <- socket (addrFamily serverAddr) Stream defaultProtocol
@@ -37,12 +39,12 @@ Check for VNC server
 
 >     sendInts sock []
 >     msg <- recvString sock 12
->     putStr $ "Server Protocol Version: " ++ msg
+>     status verbose $ "Server Protocol Version: " ++ msg
 
 Choose version number
 
 >     let version = "RFB 003.007\n"
->     putStr $ "Requsted Protocol Version: " ++ version
+>     status verbose $ "Requsted Protocol Version: " ++ version
 >     sendString sock version
 
 Receive number of security types
@@ -52,7 +54,7 @@ Receive number of security types
 Receive security types
 
 >     securityTypes <- recvInts sock numberOfSecurityTypes
->     putStrLn $ "Server Security Types: " ++ show securityTypes
+>     status verbose $ "Server Security Types: " ++ show securityTypes
 
 Choose security type
 
@@ -108,9 +110,9 @@ Get server name
 
 >     serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
->     putStrLn $ "Server Name: " ++ serverName
->     putStrLn $ "Framebuffer: " ++ show framebuffer
->     putStrLn $ "Encoding and pixel format: " ++ show format
+>     status verbose $ "Server Name: " ++ serverName
+>     status verbose $ "Framebuffer: " ++ show framebuffer
+>     status verbose $ "Encoding and pixel format: " ++ show format
 
 >     setEncodings sock format
 >     setPixelFormat sock format
@@ -156,3 +158,12 @@ Close socket
 > withEcho echo action = do
 >   old <- hGetEcho stdin
 >   bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
+
+\subsection{status function}
+
+Print message about the current status if verbose option is enabled.
+
+> status :: Bool -> String -> IO ()
+> status verbose msg = if verbose
+>                          then putStrLn msg
+>                          else return ()
