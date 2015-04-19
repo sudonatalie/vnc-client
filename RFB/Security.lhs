@@ -34,7 +34,9 @@ Final permutation
 \subsection{Feistel functions}
 
 > feistel :: [Int] -> Int -> [[Int]] -> [Int]
-> feistel rightBlock roundCount subkeys = feistelPermutation (feistelSub (splitEvery 6 (feistelMix rightBlock (subkeys !! roundCount))))
+> feistel rightBlock roundCount subkeys =
+>     feistelPermutation (feistelSub
+>     (splitEvery 6 (feistelMix rightBlock (subkeys !! roundCount))))
 
 Feistel key mixing with feistel expansion
 

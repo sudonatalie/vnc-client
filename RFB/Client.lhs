@@ -65,11 +65,13 @@
 > createVNCDisplay x y w h = do
 >     display <- openDisplay ""
 >     rootw <- rootWindow display (defaultScreen display)
->     win <- mkUnmanagedWindow display (defaultScreenOfDisplay display) rootw (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
+>     win <-  mkUnmanagedWindow display (defaultScreenOfDisplay display)
+>             rootw (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
 >     setTextProperty display win "VNC Client" wM_NAME
 >     mapWindow display win
 >     gc <- createGC display win
->     pixmap <- createPixmap display rootw (fromIntegral w) (fromIntegral h) (defaultDepthOfScreen (defaultScreenOfDisplay display))
+>     pixmap <-  createPixmap display rootw (fromIntegral w) (fromIntegral h)
+>                (defaultDepthOfScreen (defaultScreenOfDisplay display))
 >     pixgc <- createGC display pixmap
 >     let vncDisplay = VNCDisplayWindow  { display  = display
 >                                                     , rootw    = rootw
@@ -83,7 +85,8 @@
 >     return vncDisplay
 
 > swapBuffer :: VNCDisplayWindow -> IO ()
-> swapBuffer xWindow = copyArea (display xWindow) (pixmap xWindow) (win xWindow) (pixgc xWindow) 0 0 (width xWindow) (height xWindow) 0 0
+> swapBuffer xWindow =  copyArea (display xWindow) (pixmap xWindow) (win xWindow)
+>                       (pixgc xWindow) 0 0 (width xWindow) (height xWindow) 0 0
 
 > vncMainLoop :: Socket -> Box -> VNCDisplayWindow -> Int -> IO ()
 > vncMainLoop _    _           _       0  = return ()
@@ -99,7 +102,8 @@
 > handleServerMessage 3 sock _        = return () -- updateClipboard sock
 > handleserverMessage _ _    _        = return ()
 
-> mkUnmanagedWindow :: Display -> Screen -> Window -> Position -> Position -> Dimension -> Dimension -> IO Window
+> mkUnmanagedWindow ::  Display -> Screen -> Window ->
+>                       Position -> Position -> Dimension -> Dimension -> IO Window
 > mkUnmanagedWindow d s rw x y w h = do
 >     let visual = defaultVisualOfScreen s
 >     let attrmask = cWOverrideRedirect
@@ -188,17 +192,23 @@
 >                     , y = bytesToInt [y1, y2]
 >                     , w = bytesToInt [w1, w2]
 >                     , h = bytesToInt [h1, h2] }
->     displayRectangle (bytesToInt [e1, e2, e3, e4]) xWindow sock (bitsPerPixel format) (x rect) (y rect ) (w rect) (h rect)
+>     displayRectangle (bytesToInt [e1, e2, e3, e4]) xWindow sock
+>         (bitsPerPixel format) (x rect) (y rect ) (w rect) (h rect)
 >     handleRectangleHeader xWindow sock (n-1)
 
-> displayRectangle :: Int -> VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> IO ()
-> displayRectangle 0 xWindow sock bpp x y w h  = decodeRAW xWindow sock bpp x w h x y
-> displayRectangle 1 xWindow sock bpp x y w h  = decodeCopyRect xWindow sock x y w h
-> displayRectangle _ _       _    _   _ _ _ _  = return ()
+> displayRectangle ::  Int -> VNCDisplayWindow -> Socket ->
+>                      Int -> Int -> Int -> Int -> Int -> IO ()
+> displayRectangle  0  xWindow  sock  bpp  x  y  w  h  =
+>     decodeRAW  xWindow  sock  bpp  x  w  h  x  y
+> displayRectangle  1  xWindow  sock  bpp  x  y  w  h  =
+>     decodeCopyRect  xWindow  sock  x  y  w  h
+> displayRectangle  _  _        _     _    _  _  _  _  =
+>     return ()
 
-> decodeRAW :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-> decodeRAW _       _    _   _  _ 0 _ _  = return ()
-> decodeRAW xWindow sock bpp x0 w h x y  = do
+> decodeRAW ::  VNCDisplayWindow -> Socket ->
+>               Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+> decodeRAW  _        _     _    _   _  0  _  _  = return ()
+> decodeRAW  xWindow  sock  bpp  x0  w  h  x  y  = do
 >     color <- recvColor sock bpp
 >     displayPixel xWindow x y color
 >     if ((x+1) >= x0+w)
@@ -208,7 +218,10 @@
 > decodeCopyRect :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> IO ()
 > decodeCopyRect xWindow sock x y w h = do
 >     srcx1:srcx2:srcy1:srcy2:_ <- recvInts sock 4
->     copyArea (display xWindow) (pixmap xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral (bytesToInt [srcx1, srcx2])) (fromIntegral (bytesToInt [srcy1, srcy2])) (fromIntegral w) (fromIntegral h) (fromIntegral x) (fromIntegral y)
+>     copyArea (display xWindow) (pixmap xWindow) (pixmap xWindow) (pixgc xWindow)
+>         (fromIntegral (bytesToInt [srcx1, srcx2]))
+>         (fromIntegral (bytesToInt [srcy1, srcy2]))
+>         (fromIntegral w) (fromIntegral h) (fromIntegral x) (fromIntegral y)
 
 > recvColor :: Socket -> Int -> IO Int
 > recvColor sock 32 = do
@@ -228,4 +241,5 @@
 > displayPixel :: VNCDisplayWindow -> Int -> Int -> Int -> IO ()
 > displayPixel xWindow x y color = do
 >     setForeground (display xWindow) (pixgc xWindow) (fromIntegral color)
->     drawPoint (display xWindow) (pixmap xWindow) (pixgc xWindow) (fromIntegral x) (fromIntegral y)
+>     drawPoint (display xWindow) (pixmap xWindow) (pixgc xWindow)
+>         (fromIntegral x) (fromIntegral y)
