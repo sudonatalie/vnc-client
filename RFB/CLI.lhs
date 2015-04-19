@@ -100,10 +100,14 @@ Get server initialisation message
 >      l1:l2:l3:l4:
 >      _) <- recvInts sock 24
 
->     let framebuffer = Box  { x = 0
->                            , y = 0
->                            , w = 640--bytesToInt [w1, w2]
->                            , h = 640--bytesToInt [h1, h2] 
+>     let framebuffer = Box  { x = left
+>                            , y = top
+>                            , w = case width of
+>                                      Just w -> w
+>                                      Nothing -> bytesToInt [w1, w2] - left
+>                            , h = case height of
+>                                      Just h -> h
+>                                      Nothing -> bytesToInt [h1, h2] - top
 >                            }
 
 Get server name
@@ -119,7 +123,7 @@ Get server name
 
 >     framebufferUpdateRequest sock 0 framebuffer
 
->     xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
+>     xWindow <- createVNCDisplay 0 0 (w framebuffer) (h framebuffer)
 
 Display screen image
 

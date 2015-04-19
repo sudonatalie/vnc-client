@@ -87,10 +87,15 @@ Get server initialisation message
 >      l1:l2:l3:l4:
 >      _) <- recvInts sock 24
 
->     let framebuffer = Box { x = 0
->                           , y = 0
->                           , w = bytesToInt [w1, w2]
->                           , h = bytesToInt [h1, h2] }
+>     let framebuffer = Box  { x = left
+>                            , y = top
+>                            , w = case width of
+>                                      Just w -> w
+>                                      Nothing -> bytesToInt [w1, w2] - left
+>                            , h = case height of
+>                                      Just h -> h
+>                                      Nothing -> bytesToInt [h1, h2] - top
+>                            }
 
 Get server name
 
@@ -101,7 +106,7 @@ Get server name
 
 >     framebufferUpdateRequest sock 0 framebuffer
 
->     xWindow <- createVNCDisplay 640 0 (w framebuffer) (h framebuffer)
+>     xWindow <- createVNCDisplay 0 0 (w framebuffer) (h framebuffer)
 >     
 >     (_:_:n1:n2:_) <- recvInts sock 4
 >     handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
