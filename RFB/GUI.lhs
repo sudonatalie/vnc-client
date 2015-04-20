@@ -62,10 +62,6 @@ Reveive 16 byte challenge
 
 >         challenge <- recvInts sock 16
 
-Get password from user
-
->         password <- getPassword
-
 Hash password with cypher
 
 >         let subkeys = getSubkeys password
