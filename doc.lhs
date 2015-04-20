@@ -29,6 +29,7 @@
 \maketitle
 
 %include Main.lhs
+%include Data.lhs
 %include RFB/CLI.lhs
 %include RFB/GUI.lhs
 %include RFB/Client.lhs
