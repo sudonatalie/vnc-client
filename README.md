@@ -1,6 +1,11 @@
 Haskell VNC Client
 ==================
 
+Notice
+------
+
+This is an experimental alpha project which is still under active development. 
+
 Installation
 ------------
 
