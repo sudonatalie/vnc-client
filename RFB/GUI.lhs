@@ -120,7 +120,7 @@ Get server name
 >     handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
 >     swapBuffer xWindow
 >     
->     vncMainLoop sock framebuffer xWindow 1000
+>     vncMainLoop sock framebuffer xWindow
 
 >     putStrLn "To kill application, press [Enter]..."
 >     hold <- getLine

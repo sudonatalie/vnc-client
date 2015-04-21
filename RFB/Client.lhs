@@ -88,13 +88,12 @@
 > swapBuffer xWindow =  copyArea (display xWindow) (pixmap xWindow) (win xWindow)
 >                       (pixgc xWindow) 0 0 (width xWindow) (height xWindow) 0 0
 
-> vncMainLoop :: Socket -> Box -> VNCDisplayWindow -> Int -> IO ()
-> vncMainLoop _    _           _       0  = return ()
-> vncMainLoop sock framebuffer xWindow n  = do
+> vncMainLoop :: Socket -> Box -> VNCDisplayWindow -> IO ()
+> vncMainLoop sock framebuffer xWindow  = do
 >     framebufferUpdateRequest sock 1 framebuffer
 >     message:_ <-recvInts sock 1
 >     handleServerMessage message sock xWindow
->     vncMainLoop sock framebuffer xWindow (n-1)
+>     vncMainLoop sock framebuffer xWindow
 
 > handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> IO ()
 > handleServerMessage 0 sock xWindow  = refreshWindow sock xWindow
