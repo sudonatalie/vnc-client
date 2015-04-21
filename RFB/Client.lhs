@@ -64,9 +64,12 @@
 > createVNCDisplay :: Int -> Int -> Int -> Int -> IO VNCDisplayWindow
 > createVNCDisplay x y w h = do
 >     display <- openDisplay ""
->     rootw <- rootWindow display (defaultScreen display)
->     win <-  mkUnmanagedWindow display (defaultScreenOfDisplay display)
->             rootw (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
+>     let defaultX = defaultScreen display
+>         border = blackPixel display defaultX
+>         background = blackPixel display defaultX
+>     rootw <- rootWindow display defaultX
+>     win <- createSimpleWindow display rootw (fromIntegral x) (fromIntegral y)
+>         (fromIntegral w) (fromIntegral h) 0 border background
 >     setTextProperty display win "VNC Client" wM_NAME
 >     mapWindow display win
 >     gc <- createGC display win
@@ -100,17 +103,6 @@
 > handleServerMessage 2 _    _        = putStr "\a"
 > handleServerMessage 3 sock _        = return () -- updateClipboard sock
 > handleserverMessage _ _    _        = return ()
-
-> mkUnmanagedWindow ::  Display -> Screen -> Window ->
->                       Position -> Position -> Dimension -> Dimension -> IO Window
-> mkUnmanagedWindow d s rw x y w h = do
->     let visual = defaultVisualOfScreen s
->     let attrmask = cWOverrideRedirect
->     allocaSetWindowAttributes $
->         \attributes -> do
->            set_override_redirect attributes True
->            createWindow d rw x y w h 0 (defaultDepthOfScreen s)
->                         inputOutput visual attrmask attributes
 
 > setEncodings :: Socket -> RFBFormat -> IO Int
 > setEncodings sock format =
