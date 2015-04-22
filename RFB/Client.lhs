@@ -143,6 +143,17 @@
 >     handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
 >     swapBuffer xWindow
 
+> recvFixedLength :: Socket -> Int -> IO B8.ByteString
+> recvFixedLength s l = do
+>     x <- recv s l
+>     if B8.length x < l
+>     then if B8.length x == 0
+>         then error "Connection Lost" 
+>         else do
+>             y <- recv s (l - B8.length x)
+>             return (B8.append x y)
+>     else return x
+
 > bytestringToInts :: B8.ByteString -> [Int]
 > bytestringToInts = map ord . B8.unpack
 
@@ -150,10 +161,10 @@
 > intsToBytestring = B8.pack . map chr
 
 > recvString :: Socket -> Int -> IO [Char]
-> recvString s l = fmap B8.unpack (recv s l)
+> recvString s l = fmap B8.unpack (recvFixedLength s l)
 
 > recvInts :: Socket -> Int -> IO [Int]
-> recvInts s l = fmap bytestringToInts (recv s l)
+> recvInts s l = fmap bytestringToInts (recvFixedLength s l)
 
 > sendString :: Socket -> String -> IO Int
 > sendString s l = send s (B8.pack l)
