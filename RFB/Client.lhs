@@ -12,7 +12,7 @@
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
 
-Endoding types are listed in order of priority:
+Encoding types are listed in order of desired priority:
 \begin{itemize}
   \item 1 - CopyRect
   \item 2 - RRE
@@ -61,6 +61,7 @@ Implemented but not in the encodings list:
 >                          , bpp      :: Int
 >                          }
 
+
 > createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
 > createVNCDisplay bpp x y w h = do
 >     display <- openDisplay ""
@@ -86,14 +87,18 @@ Implemented but not in the encodings list:
 >                                        , height   = (fromIntegral h)
 >                                        , bpp      = bpp
 >                                        }
+>     --let eventMask = keyPressMask.|.keyReleaseMask
+>     --selectInput display win eventMask
 >     return vncDisplay
 
-Swap buffered image to the displayed window. This function allows double buffering.
+Swap the buffered image to the displayed window. This function allows double buffering.
 This reduces the time it takes to draw an update, and eliminates any tearing effects.
 
 > swapBuffer :: VNCDisplayWindow -> IO ()
 > swapBuffer xWindow =  copyArea (display xWindow) (pixmap xWindow) (win xWindow)
 >                       (pixgc xWindow) 0 0 (width xWindow) (height xWindow) 0 0
+
+This is the main loop of the application.
 
 > vncMainLoop :: Socket -> Box -> VNCDisplayWindow -> Int -> Int -> IO ()
 > vncMainLoop sock framebuffer xWindow l t = do
@@ -102,20 +107,39 @@ This reduces the time it takes to draw an update, and eliminates any tearing eff
 >     handleServerMessage message sock xWindow l t
 >     vncMainLoop sock framebuffer xWindow l t
 
+\subsection{RFB Functions}
+\subsubsection{Server to Client Messages}
+
 Get a message from the sever, and send it to the right function to handle the data
 that will follow after it. The message types are:
 \begin{itemize}
   \item 0 - Graphics update
+  \item 1 - get color map data (not implemented)
   \item 2 - Beep sound
   \item 3 - cut text from server
-  \item 4 - get color map data (not implemented)
 \end{itemize}
 
 > handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
 > handleServerMessage 0 sock xWindow l t = refreshWindow sock xWindow l t
-> handleServerMessage 2 _    _       _ _ = putStr "\a"
+> handleServerMessage 2 _    _       _ _ = putStr "\a" -- Beep
 > handleServerMessage 3 sock _       _ _ = serverCutText sock
 > handleServerMessage _ _    _       _ _ = return ()
+
+> refreshWindow :: Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
+> refreshWindow sock xWindow l t = do
+>     (_:n1:n2:_) <- recvInts sock 3
+>     handleRectangleHeader xWindow sock (bytesToInt [n1, n2]) l t
+>     swapBuffer xWindow
+
+> serverCutText :: Socket -> IO ()
+> serverCutText sock = do
+>     (_:_:_:l1:l2:l3:l4:_) <- recvInts sock 7
+>     cutText <- recvString sock (bytesToInt [l1, l2, l3, l4])
+>     -- we should be copying cutText to the clipboard here
+>     -- but we will print instead
+>     putStrLn cutText
+
+\subsubsection{Client to Server Messages}
 
 > setEncodings :: Socket -> RFBFormat -> IO Int
 > setEncodings sock format =
@@ -150,19 +174,19 @@ that will follow after it. The message types are:
 >                      ++ intToBytes 2 (w framebuffer)
 >                      ++ intToBytes 2 (h framebuffer))
 
-> refreshWindow :: Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
-> refreshWindow sock xWindow l t = do
->     (_:n1:n2:_) <- recvInts sock 3
->     handleRectangleHeader xWindow sock (bytesToInt [n1, n2]) l t
->     swapBuffer xWindow
+> sendKeyEvent :: Socket -> Bool -> Int -> IO Int
+> sendKeyEvent sock True key =
+>     sendInts sock ([4 -- message type
+>                   , 1
+>                   , 0, 0 ]
+>                   ++ (intToBytes 4 key))
+> sendKeyEvent sock False key =
+>     sendInts sock ([4 -- message type
+>                   , 0
+>                   , 0, 0 ]
+>                   ++ (intToBytes 4 key))  
 
-> serverCutText :: Socket -> IO ()
-> serverCutText sock = do
->     (_:_:_:l1:l2:l3:l4:_) <- recvInts sock 7
->     cutText <- recvString sock (bytesToInt [l1, l2, l3, l4])
->     -- we should be copying cutText to the clipboard here
->     -- but we will print instead
->     putStrLn cutText
+\subsection {Network Functions and Type Convertions}
 
 > recvFixedLength :: Socket -> Int -> IO B8.ByteString
 > recvFixedLength s l = do
@@ -202,7 +226,7 @@ that will follow after it. The message types are:
 > intToBytes l 0  = 0 : intToBytes (l-1) 0
 > intToBytes l b  = intToBytes (l-1) (shiftR (b .&. 0xFFFFFF00) 8) ++ [ b .&. 0xFF ]
 
-\section{Graphics Funcitons}
+\subsection{Graphics Functions}
 
 Get the header information for each rectangle to be drawn.
 
