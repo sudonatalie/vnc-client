@@ -202,8 +202,8 @@
 >                      Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > displayRectangle  0  xWindow  sock  bpp  x  y  w  h  l  t  =
 >     decodeRAW  xWindow  sock  bpp  x  w  h  x  y  l  t
-> displayRectangle  1  xWindow  sock  bpp  x  y  w  h  _  _  =
->     decodeCopyRect  xWindow  sock  x  y  w  h
+> displayRectangle  1  xWindow  sock  bpp  x  y  w  h  l  t  =
+>     decodeCopyRect  xWindow  sock  x  y  w  h  l  t
 > displayRectangle  _  _        _     _    _  _  _  _  _  _=
 >     return ()
 
@@ -217,13 +217,13 @@
 >         then decodeRAW xWindow sock bpp x0 w (h-1) x0 (y+1) l t
 >         else decodeRAW xWindow sock bpp x0 w h (x+1) y l t
 
-> decodeCopyRect :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> IO ()
-> decodeCopyRect xWindow sock x y w h = do
+> decodeCopyRect :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+> decodeCopyRect xWindow sock x y w h l t = do
 >     srcx1:srcx2:srcy1:srcy2:_ <- recvInts sock 4
 >     copyArea (display xWindow) (pixmap xWindow) (pixmap xWindow) (pixgc xWindow)
->         (fromIntegral (bytesToInt [srcx1, srcx2]))
->         (fromIntegral (bytesToInt [srcy1, srcy2]))
->         (fromIntegral w) (fromIntegral h) (fromIntegral x) (fromIntegral y)
+>         (fromIntegral (bytesToInt [srcx1, srcx2] - l))
+>         (fromIntegral (bytesToInt [srcy1, srcy2] - t))
+>         (fromIntegral w) (fromIntegral h) (fromIntegral (x-l)) (fromIntegral (y-t))
 
 > recvColor :: Socket -> Int -> IO Int
 > recvColor sock 32 = do
