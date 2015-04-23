@@ -51,7 +51,7 @@ Implemented but not in the encodings list:
 
 > format =  RFBFormat
 >           { encodingTypes   = [1, 2, 0] -- in order of priority
->           , bitsPerPixel    = 32
+>           , bitsPerPixel    = 24
 >           , depth           = 24
 >           , bigEndianFlag   = 0
 >           , trueColourFlag  = 1
@@ -110,10 +110,18 @@ Implemented but not in the encodings list:
 >     handleServerMessage message sock xWindow l t
 >     vncMainLoop sock framebuffer xWindow l t
 
+Get a message from the sever, and send it to the right function to handle the data
+that will follow after it. The message types are:
+\begin{itemize}
+  \item 0 - Graphics update
+  \item 2 - Beep sound
+  \item 3 - cut text from server
+\end{itemize}
+
 > handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
 > handleServerMessage 0 sock xWindow l t = refreshWindow sock xWindow l t
 > handleServerMessage 2 _    _       _ _ = putStr "\a"
-> handleServerMessage 3 sock _       _ _ = putStrLn "cutServerText"--return () -- updateClipboard sock
+> handleServerMessage 3 sock _       _ _ = serverCutText sock
 > handleServerMessage _ _    _       _ _ = return ()
 
 > setEncodings :: Socket -> RFBFormat -> IO Int
@@ -154,6 +162,14 @@ Implemented but not in the encodings list:
 >     (_:n1:n2:_) <- recvInts sock 3
 >     handleRectangleHeader xWindow sock (bytesToInt [n1, n2]) l t
 >     swapBuffer xWindow
+
+> serverCutText :: Socket -> IO ()
+> serverCutText sock = do
+>     (_:_:_:l1:l2:l3:l4:_) <- recvInts sock 7
+>     cutText <- recvString sock (bytesToInt [l1, l2, l3, l4])
+>     -- we should be copying cutText to the clipboard here
+>     -- but we will print instead
+>     putStrLn cutText
 
 > recvFixedLength :: Socket -> Int -> IO B8.ByteString
 > recvFixedLength s l = do
