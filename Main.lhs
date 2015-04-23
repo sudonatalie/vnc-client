@@ -18,6 +18,7 @@ The command line options currently supported are:
 \item authentication type (None or VNC)
 \item port number
 \item top, left, width and height of frame
+\item bits per pixel
 \end{enumerate}
 
 \subsubsection{Defaults}
@@ -34,6 +35,7 @@ Each option has a default value.
 >                   , optLeft = 0
 >                   , optWidth = Nothing
 >                   , optHeight = Nothing
+>                   , optBPP = 32
 >                   }
 
 \subsubsection{Option Descriptions}
@@ -70,6 +72,9 @@ The following option descriptions are used for \texttt{--help}.
 >            , Option ['h'] ["height"]
 >                (ReqArg (\ h opts -> opts { optHeight = Just (read h :: Int) }) "HEIGHT")
 >                "height (default: entire framebuffer)"
+>            , Option "b" ["bits-per-pixel"]
+>                (ReqArg (\ bpp opts -> opts { optBPP = read bpp :: Int }) "BITSPERPIXEL")
+>                "bits per pixel (default: 32)"
 >            ]
 
 > parseOpts :: [String] -> IO (Options, [String])
@@ -95,7 +100,8 @@ First, get and parse the command line arguments as options.
 >                    , optTop        = top
 >                    , optLeft       = left
 >                    , optWidth      = width
->                    , optHeight     = height }
+>                    , optHeight     = height
+>                    , optBPP        = bpp }
 >         , params) <- parseOpts args
 
 \subsubsection{Help}
@@ -119,6 +125,7 @@ VNC password authentication)
   -l LEFT    --left=LEFT      left position (default: 0)
   -w WIDTH   --width=WIDTH    width (default: entire framebuffer)
   -h HEIGHT  --height=HEIGHT  height (default: entire framebuffer)
+  -b BITSPERPIXEL  --bits-per-pixel=BITSPERPIXEL  bits per pixel (default: 32)
 \end{verbatim}
 
 \subsubsection{GUI}

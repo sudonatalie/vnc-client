@@ -12,6 +12,17 @@
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
 
+Endoding types are listed in order of priority:
+\begin{itemize}
+  \item 1 - CopyRect
+  \item 2 - RRE
+  \item 0 - RAW
+\end{itemize}
+Implemented but not in the encodings list:
+\begin{itemize}
+  \item (-239) - cursor pseudo-encoding
+\end{itemize}
+
 > data RFBFormat =  RFBFormat
 >                   { encodingTypes   :: [Int]
 >                   , bitsPerPixel    :: Int
@@ -38,30 +49,6 @@
 >                   , pixels     :: [Pixel]
 >                   }
 
-Endoding types are listed in order of priority:
-\begin{itemize}
-  \item 1 - CopyRect
-  \item 2 - RRE
-  \item 0 - RAW
-\end{itemize}
-Implemented but not in the encodings list:
-\begin{itemize}
-  \item (-239) - cursor pseudo-encoding
-\end{itemize}
-
-> format =  RFBFormat
->           { encodingTypes   = [1, 2, 0] -- in order of priority
->           , bitsPerPixel    = 24
->           , depth           = 24
->           , bigEndianFlag   = 0
->           , trueColourFlag  = 1
->           , redMax          = 255
->           , greenMax        = 255
->           , blueMax         = 255
->           , redShift        = 0
->           , greenShift      = 8
->           , blueShift       = 16 }
-
 > data VNCDisplayWindow =  VNCDisplayWindow
 >                          { display  :: Display  -- X display
 >                          , rootw    :: Window   -- root window
@@ -70,11 +57,12 @@ Implemented but not in the encodings list:
 >                          , wingc    :: GC       -- graphics contexts
 >                          , pixgc    :: GC
 >                          , width    :: Dimension
->                          , height   :: Dimension 
+>                          , height   :: Dimension
+>                          , bpp      :: Int
 >                          }
 
-> createVNCDisplay :: Int -> Int -> Int -> Int -> IO VNCDisplayWindow
-> createVNCDisplay x y w h = do
+> createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
+> createVNCDisplay bpp x y w h = do
 >     display <- openDisplay ""
 >     let defaultX = defaultScreen display
 >         border = blackPixel display defaultX
@@ -89,15 +77,19 @@ Implemented but not in the encodings list:
 >                (defaultDepthOfScreen (defaultScreenOfDisplay display))
 >     pixgc <- createGC display pixmap
 >     let vncDisplay = VNCDisplayWindow  { display  = display
->                                                     , rootw    = rootw
->                                                     , win      = win
->                                                     , pixmap   = pixmap
->                                                     , wingc    = gc
->                                                     , pixgc    = pixgc
->                                                     , width    = (fromIntegral w)
->                                                     , height   = (fromIntegral h)
->                                                     }
+>                                        , rootw    = rootw
+>                                        , win      = win
+>                                        , pixmap   = pixmap
+>                                        , wingc    = gc
+>                                        , pixgc    = pixgc
+>                                        , width    = (fromIntegral w)
+>                                        , height   = (fromIntegral h)
+>                                        , bpp      = bpp
+>                                        }
 >     return vncDisplay
+
+Swap buffered image to the displayed window. This function allows double buffering.
+This reduces the time it takes to draw an update, and eliminates any tearing effects.
 
 > swapBuffer :: VNCDisplayWindow -> IO ()
 > swapBuffer xWindow =  copyArea (display xWindow) (pixmap xWindow) (win xWindow)
@@ -116,6 +108,7 @@ that will follow after it. The message types are:
   \item 0 - Graphics update
   \item 2 - Beep sound
   \item 3 - cut text from server
+  \item 4 - get color map data (not implemented)
 \end{itemize}
 
 > handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
@@ -227,7 +220,7 @@ Get the header information for each rectangle to be drawn.
 >                     , w = bytesToInt [w1, w2]
 >                     , h = bytesToInt [h1, h2] }
 >     displayRectangle (fromIntegral (bytesToInt [e1, e2, e3, e4])) xWindow sock
->         (bitsPerPixel format) (x rect) (y rect) (w rect) (h rect) l t
+>         (bpp xWindow) (x rect) (y rect) (w rect) (h rect) l t
 >     handleRectangleHeader xWindow sock (n-1) l t
 
 Choose which decoding function to use for the rectangle.

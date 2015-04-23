@@ -12,4 +12,5 @@
 >                 , optLeft :: Int
 >                 , optWidth :: Maybe Int
 >                 , optHeight :: Maybe Int
+>                 , optBPP :: Int
 >                 } deriving Show

@@ -24,8 +24,22 @@
 >                       , optTop        = top
 >                       , optLeft       = left
 >                       , optWidth      = width
->                       , optHeight     = height }
+>                       , optHeight     = height
+>                       , optBPP        = bpp }
 >     = withSocketsDo $ do
+
+>     let format = RFBFormat
+>           { encodingTypes   = [1, 2, 0] -- in order of priority
+>           , bitsPerPixel    = bpp
+>           , depth           = 24
+>           , bigEndianFlag   = 0
+>           , trueColourFlag  = 1
+>           , redMax          = 255
+>           , greenMax        = 255
+>           , blueMax         = 255
+>           , redShift        = 0
+>           , greenShift      = 8
+>           , blueShift       = 16 }
 
 Connect to server via socket
 
@@ -130,7 +144,7 @@ Get server name
 
 >     framebufferUpdateRequest sock 0 framebuffer
 
->     xWindow <- createVNCDisplay 0 0 (w framebuffer) (h framebuffer)
+>     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
 
 Display screen image
 
