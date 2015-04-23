@@ -7,6 +7,7 @@
 > import qualified Data.ByteString.Char8 as B8
 > import Data.Char (ord, chr)
 > import Data.Bits
+> import Data.Int
 > import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
@@ -101,8 +102,8 @@
 > handleServerMessage :: Int -> Socket -> VNCDisplayWindow -> Int -> Int -> IO ()
 > handleServerMessage 0 sock xWindow l t = refreshWindow sock xWindow l t
 > handleServerMessage 2 _    _       _ _ = putStr "\a"
-> handleServerMessage 3 sock _       _ _ = return () -- updateClipboard sock
-> handleserverMessage _ _    _       _ _ = return ()
+> handleServerMessage 3 sock _       _ _ = putStrLn "cutServerText"--return () -- updateClipboard sock
+> handleServerMessage _ _    _       _ _ = return ()
 
 > setEncodings :: Socket -> RFBFormat -> IO Int
 > setEncodings sock format =
@@ -179,7 +180,11 @@
 > intToBytes :: Int -> Int -> [Int]
 > intToBytes 0 _  = []
 > intToBytes l 0  = 0 : intToBytes (l-1) 0
-> intToBytes l b  = intToBytes (l-1) (shiftR (b .&. 0xFF00) 8) ++ [ b .&. 0xFF ]
+> intToBytes l b  = intToBytes (l-1) (shiftR (b .&. 0xFFFFFF00) 8) ++ [ b .&. 0xFF ]
+
+\section{Graphics Funcitons}
+
+Get the header information for each rectangle to be drawn.
 
 > handleRectangleHeader :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> IO ()
 > handleRectangleHeader _       _    0  _  _  = return ()
@@ -194,23 +199,29 @@
 >                     , y = bytesToInt [y1, y2]
 >                     , w = bytesToInt [w1, w2]
 >                     , h = bytesToInt [h1, h2] }
->     displayRectangle (bytesToInt [e1, e2, e3, e4]) xWindow sock
+>     displayRectangle (fromIntegral (bytesToInt [e1, e2, e3, e4])) xWindow sock
 >         (bitsPerPixel format) (x rect) (y rect) (w rect) (h rect) l t
 >     handleRectangleHeader xWindow sock (n-1) l t
 
-> displayRectangle ::  Int -> VNCDisplayWindow -> Socket ->
+Choose which decoding function to use for the rectangle.
+
+> displayRectangle ::  Int32 -> VNCDisplayWindow -> Socket ->
 >                      Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > displayRectangle  0  xWindow  sock  bpp  x  y  w  h  l  t  =
 >     decodeRAW  xWindow  sock  bpp  x  w  h  x  y  l  t
 > displayRectangle  1  xWindow  sock  bpp  x  y  w  h  l  t  =
 >     decodeCopyRect  xWindow  sock  x  y  w  h  l  t
+> displayRectangle  (-239)  xWindow  sock  bpp  x  y  w  h  l  t  =
+>     pseudoDecodeCursor  xWindow  sock  bpp  x  y  w  h  l  t
 > displayRectangle  _  _        _     _    _  _  _  _  _  _=
 >     return ()
+
+\subsubsection{Image Decoding Functions}
 
 > decodeRAW ::  VNCDisplayWindow -> Socket ->
 >               Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > decodeRAW  _        _     _    _   _  0  _  _  _  _  = return ()
-> decodeRAW  xWindow  sock  bpp  x0  w  h  x  y  l  t  = do
+> decodeRAW  xWindow  sock  bpp  x0  w  h  x  y  l  t  = do	
 >     color <- recvColor sock bpp
 >     displayPixel xWindow (x-l) (y-t) color
 >     if ((x+1) >= x0+w)
@@ -224,6 +235,18 @@
 >         (fromIntegral (bytesToInt [srcx1, srcx2] - l))
 >         (fromIntegral (bytesToInt [srcy1, srcy2] - t))
 >         (fromIntegral w) (fromIntegral h) (fromIntegral (x-l)) (fromIntegral (y-t))
+
+> pseudoDecodeCursor :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+> pseudoDecodeCursor xWindow sock bpp x y w h l t = do
+>     colorList <- (recvColorList sock bpp (w*h))
+>     bitMask <- recvBitMask sock (( (w+7) `div` 8) * h)
+>     putStrLn "pointer!"
+>     drawBitmaskedPixels xWindow 100 w (((w+7)`div`8)*8) colorList bitMask 100 100
+>     return ()
+
+\subsubsection{Drawing to Screen}
+
+Get the color to be drawn. Supports may bit per pixel formats.
 
 > recvColor :: Socket -> Int -> IO Int
 > recvColor sock 32 = do
@@ -239,6 +262,48 @@
 >     color:_ <- recvInts sock 1
 >     return color
 > recvColor _ _ = return 0
+
+Get an array of colors.
+
+> recvColorList :: Socket -> Int -> Int -> IO [Int]
+> recvColorList _ _ 0 = return []
+> recvColorList sock bpp size = do 
+>     color <- recvColor sock bpp
+>     xs <- recvColorList sock bpp (size-1)
+>     return $ color:xs
+
+Get Bitmask array to describe which pixels in an image are valid.
+
+> recvBitMask :: Socket -> Int -> IO [Bool]
+> recvBitMask _ 0 = return []
+> recvBitMask sock size = do
+>     byte:_ <- recvInts sock 1
+>     xs <- recvBitMask sock (size-1)
+>     return $ ((byte .&. 0x80)>0):
+>              ((byte .&. 0x40)>0):
+>              ((byte .&. 0x20)>0):
+>              ((byte .&. 0x10)>0):
+>              ((byte .&. 0x08)>0):
+>              ((byte .&. 0x04)>0):
+>              ((byte .&. 0x02)>0):
+>              ((byte .&. 0x01)>0):xs
+
+Draw pixels based on bitmask data.
+
+> drawBitmaskedPixels :: VNCDisplayWindow -> Int -> Int -> Int -> [Int] -> [Bool] -> Int -> Int -> IO ()
+> drawBitmaskedPixels _       _  _ _        []        _       _ _ = return ()
+> drawBitmaskedPixels xWindow x0 w wBitMask colorList bitMask x y = do
+>     if x >= x0 + w
+>     then if x >= x0 + wBitMask
+>         then drawBitmaskedPixels xWindow x0 w wBitMask colorList (bitMask) x0 (y+1)
+>         else drawBitmaskedPixels xWindow x0 w wBitMask colorList (tail bitMask) (x+1) y
+>     else if (head bitMask)
+>         then do
+>             displayPixel xWindow x y (head colorList)
+>             drawBitmaskedPixels xWindow x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
+>         else drawBitmaskedPixels xWindow x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
+
+Draw an individual pixel to the buffer
 
 > displayPixel :: VNCDisplayWindow -> Int -> Int -> Int -> IO ()
 > displayPixel xWindow x y color = do
