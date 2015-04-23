@@ -139,8 +139,6 @@ Display screen image
 >     swapBuffer xWindow
 >     vncMainLoop sock framebuffer xWindow (x framebuffer) (y framebuffer)
 
->     putStrLn "To kill application, press [Enter]..."
->     hold <- getLine
 >     freeGC (display xWindow) (pixgc xWindow)
 >     freeGC (display xWindow) (wingc xWindow)
 >     freePixmap (display xWindow) (pixmap xWindow)
