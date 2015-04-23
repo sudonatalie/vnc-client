@@ -117,10 +117,10 @@ Get server name
 >     xWindow <- createVNCDisplay 0 0 (w framebuffer) (h framebuffer)
 >     
 >     (_:_:n1:n2:_) <- recvInts sock 4
->     handleRectangleHeader xWindow sock (bytesToInt [n1, n2])
+>     handleRectangleHeader xWindow sock (bytesToInt [n1, n2]) (x framebuffer) (y framebuffer)
 >     swapBuffer xWindow
 >     
->     vncMainLoop sock framebuffer xWindow
+>     vncMainLoop sock framebuffer xWindow (x framebuffer) (y framebuffer)
 
 >     putStrLn "To kill application, press [Enter]..."
 >     hold <- getLine
