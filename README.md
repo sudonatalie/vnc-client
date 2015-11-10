@@ -4,7 +4,7 @@ Haskell VNC Client
 Notice
 ------
 
-This is an experimental alpha project which is still under active development. 
+This is an experimental alpha project which is no longer under active development. 
 
 Installation
 ------------
