@@ -5,9 +5,9 @@
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
 > import qualified Data.ByteString.Char8 as B8
+> import Data.Bits ((.|.), (.&.), shiftL, shiftR)
 > import Data.Char (ord, chr)
-> import Data.Bits
-> import Data.Int
+> import Data.Int (Int32)
 > import Data.List (foldl1')
 > import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
