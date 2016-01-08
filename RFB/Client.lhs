@@ -8,6 +8,7 @@
 > import Data.Char (ord, chr)
 > import Data.Bits
 > import Data.Int
+> import Data.List (foldl1')
 > import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
@@ -65,8 +66,8 @@ Implemented but not in the encodings list:
 > createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
 > createVNCDisplay bpp x y w h = do
 >     display <- openDisplay ""
->     let defaultX = defaultScreen display
->         border = blackPixel display defaultX
+>     let defaultX   = defaultScreen display
+>         border     = blackPixel display defaultX
 >         background = blackPixel display defaultX
 >     rootw <- rootWindow display defaultX
 >     win <- createSimpleWindow display rootw (fromIntegral x) (fromIntegral y)
@@ -218,8 +219,9 @@ that will follow after it. The message types are:
 > sendInts s l = send s (intsToBytestring l)
 
 > bytesToInt :: [Int] -> Int
-> bytesToInt [] = 0
-> bytesToInt b = shiftL (bytesToInt (init b)) 8 .|. (last b)
+> bytesToInt []  = 0
+> bytesToInt [b] = b 
+> bytesToInt bs  = foldl1' (\ a b -> shiftL a 8 .|. b) bs
 
 > intToBytes :: Int -> Int -> [Int]
 > intToBytes 0 _  = []
@@ -252,7 +254,7 @@ Choose which decoding function to use for the rectangle.
 > displayRectangle ::  Int32 -> VNCDisplayWindow -> Socket ->
 >                      Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > displayRectangle  0  xWindow  sock  bpp  x  y  w  h  l  t  =
->     decodeRAW  xWindow  sock  bpp  x  w  h  x  y  l  t
+>     decodeRAW  xWindow  sock  bpp  x  y  w  h  l  t
 > displayRectangle  1  xWindow  sock  bpp  x  y  w  h  l  t  =
 >     decodeCopyRect  xWindow  sock  x  y  w  h  l  t
 > displayRectangle  2  xWindow  sock  bpp  x  y  w  h  l  t  =
@@ -265,14 +267,12 @@ Choose which decoding function to use for the rectangle.
 \subsubsection{Image Decoding Functions}
 
 > decodeRAW ::  VNCDisplayWindow -> Socket ->
->               Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-> decodeRAW  _        _     _    _   _  0  _  _  _  _  = return ()
-> decodeRAW  xWindow  sock  bpp  x0  w  h  x  y  l  t  = do	
->     color <- recvColor sock bpp
->     displayPixel xWindow (x-l) (y-t) color
->     if ((x+1) >= x0+w)
->         then decodeRAW xWindow sock bpp x0 w (h-1) x0 (y+1) l t
->         else decodeRAW xWindow sock bpp x0 w h (x+1) y l t
+>               Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+> decodeRAW  xWindow  sock  bpp  x  y  w  h  l  t  = do
+>     let colors = recvColorList sock bpp (w*h)
+>     sequence_ . zipWith (\ (a,b) c -> displayPixel xWindow a b =<< c) positions $ colors
+>     where
+>       positions = [(x,y) | y <- [(y-t)..(y-t+h-1)], x <- [(x-l)..(x-l+w-1)]]
 
 > decodeCopyRect :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > decodeCopyRect xWindow sock x y w h l t = do
@@ -291,10 +291,9 @@ Choose which decoding function to use for the rectangle.
 
 > pseudoDecodeCursor :: VNCDisplayWindow -> Socket -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 > pseudoDecodeCursor xWindow sock bpp x y w h l t = do
->     colorList <- (recvColorList sock bpp (w*h))
+>     colors  <- sequence $ recvColorList sock bpp (w*h)
 >     bitMask <- recvBitMask sock (( (w+7) `div` 8) * h)
->     drawBitmaskedPixels xWindow 100 w (((w+7)`div`8)*8) colorList bitMask 100 100
->     return ()
+>     drawBitmaskedPixels xWindow 100 w (((w+7)`div`8)*8) colors bitMask 100 100
 
 \subsubsection{Supporting Functions for Encoding}
 
@@ -316,14 +315,10 @@ Displays the subractangles for RRE encoding.
 >     drawRect xWindow (fromIntegral (x0+(x rect)-l)) (fromIntegral (y0+(y rect)-t)) (w rect) (h rect) color
 >     drawRRESubRects xWindow sock bpp x0 y0 l t (n-1)
 
-Get an array of colors.
+Get list of colors.
 
-> recvColorList :: Socket -> Int -> Int -> IO [Int]
-> recvColorList _ _ 0 = return []
-> recvColorList sock bpp size = do 
->     color <- recvColor sock bpp
->     xs <- recvColorList sock bpp (size-1)
->     return $ color:xs
+> recvColorList :: Socket -> Int -> Int -> [IO Int]
+> recvColorList sock bpp size = take size . repeat $ recvColor sock bpp
 
 Get Bitmask array to describe which pixels in an image are valid.
 
@@ -355,26 +350,29 @@ Draw pixels based on bitmask data.
 >             displayPixel xWindow x y (head colorList)
 >             drawBitmaskedPixels xWindow x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
 >         else drawBitmaskedPixels xWindow x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
+> --drawBitmaskedPixels xWindow w widthBitMask colors bitMask x y =
+> --    sequence_ . zipWith3 (\ (x, y) c bit -> if bit
+> --                                            then displayPixel xWindow x y c
+> --                                            else return ()
+> --                         )
+> --                         positions colors $ bits bitMask
+> --    where
+> --      positions = [(x,y) | y <- [y..], x <- [x..(x+w-1)]]
+> --      bits bs = if widthBitMask > w
+> --                then (\ (xs, ys) -> xs ++ (bits . drop (widthBitMask - w) $ ys)) $ splitAt w bs
+> --                else bitMask
 
 \subsubsection{Drawing to Screen}
 
-Get the color to be drawn. Supports may bit per pixel formats. 24 bpp is non-standard
+Get the color to be drawn. Supports various bit per pixel formats. 24 bpp is non-standard
 in the RFB protocol, but we support it because some servers will accept it.
 
 > recvColor :: Socket -> Int -> IO Int
-> recvColor sock 32 = do
->     r:g:b:_:_ <- recvInts sock 4
->     return (bytesToInt [r, g, b])
-> recvColor sock 24 = do
->     r:g:b:_ <- recvInts sock 3
->     return (bytesToInt [r, g, b])
-> recvColor sock 16 = do
->     f:l:_ <- recvInts sock 2
->     return (bytesToInt [f, l])
-> recvColor sock 8 = do
->     color:_ <- recvInts sock 1
->     return color
-> recvColor _ _ = return 0
+> recvColor sock 32 = recvInts sock 4 >>= return . bytesToInt . take 3
+> recvColor sock 24 = recvInts sock 3 >>= return . bytesToInt
+> recvColor sock 16 = recvInts sock 2 >>= return . bytesToInt
+> recvColor sock 8  = recvInts sock 1 >>= return . bytesToInt
+> recvColor _    _  = error "Unsupported bits-per-pixel setting"
 
 Draw an individual pixel to the buffer
 
@@ -391,4 +389,4 @@ Draw a filled rectangle to the buffer
 > drawRect xWindow x y w h color = do
 >     setForeground (display xWindow) (pixgc xWindow) (fromIntegral color)
 >     fillRectangle (display xWindow) (pixmap xWindow) (pixgc xWindow)
->         (fromIntegral x) (fromIntegral y) (fromIntegral (w)) (fromIntegral (h))
+>         (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
