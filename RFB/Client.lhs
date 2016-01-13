@@ -196,7 +196,7 @@ that will follow after it. The message types are:
 >     then if B8.length x == 0
 >         then error "Connection Lost" 
 >         else do
->             y <- recv s (l - B8.length x)
+>             y <- recvFixedLength s (l - B8.length x)
 >             return (B8.append x y)
 >     else return x
 
@@ -224,9 +224,9 @@ that will follow after it. The message types are:
 > bytesToInt bs  = foldl1' (\ a b -> shiftL a 8 .|. b) bs
 
 > intToBytes :: Int -> Int -> [Int]
-> intToBytes 0 _  = []
-> intToBytes l 0  = 0 : intToBytes (l-1) 0
-> intToBytes l b  = intToBytes (l-1) (shiftR (b .&. 0xFFFFFF00) 8) ++ [ b .&. 0xFF ]
+> intToBytes l x = let lsr = \b -> shiftR (b .&. 0xFFFFFFFFFFFFFF00) 8
+>                  in reverse . take l . fmap (.&. 0xFF) $ iterate lsr x
+
 
 \subsection{Graphics Functions}
 
