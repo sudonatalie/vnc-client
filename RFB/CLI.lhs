@@ -12,6 +12,7 @@
 > import Control.Concurrent (threadDelay)
 > import System.IO 
 > import Control.Exception
+> import Control.Monad.Reader
 
 \subsection{connect function}
 
@@ -142,16 +143,23 @@ Get server name
 >     setEncodings sock format
 >     setPixelFormat sock format
 
->     framebufferUpdateRequest sock 0 framebuffer
-
 >     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
 
 Display screen image
 
+>     let env = Environment { sock        = sock
+>                           , framebuffer = framebuffer
+>                           , xWindow     = xWindow
+>                           , leftOffset  = (x framebuffer)
+>                           , topOffset   = (y framebuffer)
+>                           }
+
+>     runReaderT (framebufferUpdateRequest 0) env
 >     message:_ <-recvInts sock 1
->     handleServerMessage message sock xWindow (x framebuffer) (y framebuffer)
->     swapBuffer xWindow
->     vncMainLoop sock framebuffer xWindow (x framebuffer) (y framebuffer)
+>     runReaderT (handleServerMessage message) env
+>     runReaderT swapBuffer env
+
+>     runReaderT vncMainLoop env
 
 >     freeGC (display xWindow) (pixgc xWindow)
 >     freeGC (display xWindow) (wingc xWindow)

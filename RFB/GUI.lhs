@@ -7,10 +7,10 @@
 > import RFB.Security
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
-
 > import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
 > import Control.Concurrent (threadDelay)
+> import Control.Monad.Reader
 
 > connect :: String -> Options -> String -> IO()
 > connect host Options  { optHelp       = _
@@ -126,15 +126,23 @@ Get server name
 >     setEncodings sock format
 >     setPixelFormat sock format
 
->     framebufferUpdateRequest sock 0 framebuffer
+
 
 >     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
->     
+>
+>     let env = Environment { sock        = sock
+>                           , framebuffer = framebuffer
+>                           , xWindow     = xWindow
+>                           , leftOffset  = (x framebuffer)
+>                           , topOffset   = (y framebuffer)
+>                           }
+
+>     runReaderT (framebufferUpdateRequest 0) env
 >     message:_ <-recvInts sock 1
->     handleServerMessage message sock xWindow (x framebuffer) (y framebuffer)
->     swapBuffer xWindow
->     
->     vncMainLoop sock framebuffer xWindow (x framebuffer) (y framebuffer)
+>     runReaderT (handleServerMessage message) env
+>     runReaderT swapBuffer env
+
+>     runReaderT vncMainLoop env
 
 >     putStrLn "To kill application, press [Enter]..."
 >     hold <- getLine
