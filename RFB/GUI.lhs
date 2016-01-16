@@ -1,16 +1,16 @@
 \section{GUI.lhs}
 
-> module RFB.GUI where
+> module RFB.GUI (RFB.GUI.connect) where
 
 > import Data
 > import RFB.Client
+> import RFB.Network
 > import RFB.Security
+> import Control.Exception (bracket_)
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
-> import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
-> import Control.Concurrent (threadDelay)
-> import Control.Monad.Reader
+> import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout)
 
 > connect :: String -> Options -> String -> IO()
 > connect host Options  { optHelp       = _
@@ -126,35 +126,12 @@ Get server name
 >     setEncodings sock format
 >     setPixelFormat sock format
 
+Run the VNC Client. This will run the X11 display window and cummunicate back
+and forth with the server.
 
-
->     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
->
->     let env = Environment { sock        = sock
->                           , framebuffer = framebuffer
->                           , xWindow     = xWindow
->                           , leftOffset  = (x framebuffer)
->                           , topOffset   = (y framebuffer)
->                           }
-
->     runReaderT (framebufferUpdateRequest 0) env
->     message:_ <-recvInts sock 1
->     runReaderT (handleServerMessage message) env
->     runReaderT swapBuffer env
-
->     runReaderT vncMainLoop env
-
->     putStrLn "To kill application, press [Enter]..."
->     hold <- getLine
-
->     freeGC (display xWindow) (pixgc xWindow)
->     freeGC (display xWindow) (wingc xWindow)
->     freePixmap (display xWindow) (pixmap xWindow)
-
->     sync (display xWindow) False
->     threadDelay (1 * 1000000)
->     exitWith ExitSuccess
+>     runVNCClient sock framebuffer bpp
 
 Close socket
 
 >     sClose sock
+>     exitWith ExitSuccess

@@ -1,18 +1,16 @@
 \section{CLI.lhs}
 
-> module RFB.CLI where
+> module RFB.CLI (RFB.CLI.connect) where
 
 > import Data
 > import RFB.Client
+> import RFB.Network
 > import RFB.Security
+> import Control.Exception (bracket_)
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
-> import Graphics.X11.Xlib
 > import System.Exit (exitWith, ExitCode(..))
-> import Control.Concurrent (threadDelay)
-> import System.IO 
-> import Control.Exception
-> import Control.Monad.Reader
+> import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout) 
 
 \subsection{connect function}
 
@@ -143,35 +141,16 @@ Get server name
 >     setEncodings sock format
 >     setPixelFormat sock format
 
->     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
+Run the VNC Client. This will run the X11 display window and cummunicate back
+and forth with the server.
 
-Display screen image
-
->     let env = Environment { sock        = sock
->                           , framebuffer = framebuffer
->                           , xWindow     = xWindow
->                           , leftOffset  = (x framebuffer)
->                           , topOffset   = (y framebuffer)
->                           }
-
->     runReaderT (framebufferUpdateRequest 0) env
->     message:_ <-recvInts sock 1
->     runReaderT (handleServerMessage message) env
->     runReaderT swapBuffer env
-
->     runReaderT vncMainLoop env
-
->     freeGC (display xWindow) (pixgc xWindow)
->     freeGC (display xWindow) (wingc xWindow)
->     freePixmap (display xWindow) (pixmap xWindow)
-
->     sync (display xWindow) False
->     threadDelay (1 * 1000000)
->     exitWith ExitSuccess
+>     runVNCClient sock framebuffer bpp
 
 Close socket
 
 >     sClose sock
+>     exitWith ExitSuccess
+
 
 \subsection{getPassword function}
 

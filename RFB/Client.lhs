@@ -1,29 +1,14 @@
 \section{Client.lhs}
 
-> module RFB.Client where
+> module RFB.Client (Box(..), RFBFormat(..), runVNCClient, setEncodings,
+>                    setPixelFormat) where
 
-> import Network.Socket hiding (send, recv)
-> import Network.Socket.ByteString (send, recv)
-> import qualified Data.ByteString.Char8 as B8
+> import RFB.Network
 > import Control.Monad.Reader
 > import Data.Bits ((.|.), (.&.), shiftL, shiftR)
-> import Data.Char (ord, chr)
 > import Data.Int (Int32)
-> import Data.List (foldl1')
 > import Graphics.X11.Xlib
-> import System.Exit (exitWith, ExitCode(..))
-> import Control.Concurrent (threadDelay)
-
-Encoding types are listed in order of desired priority:
-\begin{itemize}
-  \item 1 - CopyRect
-  \item 2 - RRE
-  \item 0 - RAW
-\end{itemize}
-Implemented but not in the encodings list:
-\begin{itemize}
-  \item (-239) - cursor pseudo-encoding
-\end{itemize}
+> import Network.Socket (Socket)
 
 > data RFBFormat =  RFBFormat
 >                   { encodingTypes   :: [Int]
@@ -45,11 +30,6 @@ Implemented but not in the encodings list:
 >             , w  :: Int
 >             , h  :: Int
 >             } deriving (Show)
-
-> data Rectangle =  Rectangle
->                   { rectangle  :: Box
->                   , pixels     :: [Pixel]
->                   }
 
 > data VNCDisplayWindow =  VNCDisplayWindow
 >                          { display  :: Display  -- X display
@@ -73,6 +53,9 @@ Implemented but not in the encodings list:
 
 > type VNCClient = ReaderT Environment IO
 
+\subsection{Main VNC Client functions}
+
+Set up and create and X11 display window.
 
 > createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
 > createVNCDisplay bpp x y w h = do
@@ -99,20 +82,38 @@ Implemented but not in the encodings list:
 >                                        , height   = (fromIntegral h)
 >                                        , bpp      = bpp
 >                                        }
->     --let eventMask = keyPressMask.|.keyReleaseMask
+>     --let eventMask = keyPressMask.||.keyReleaseMask
 >     --selectInput display win eventMask
 >     return vncDisplay
 
-Swap the buffered image to the displayed window. This function allows double
-buffering. This reduces the time it takes to draw an update, and eliminates any
-tearing effects.
+Close and destroy the X11 display window. Also, empty structures containing
+image data (possibly unnecessary).
 
-> swapBuffer :: VNCClient ()
-> swapBuffer = do
->     env <- ask
->     let xWin = xWindow env
->     liftIO $ copyArea (display xWin) (pixmap xWin) (win xWin) (pixgc xWin)
->                       0 0 (width xWin) (height xWin) 0 0
+> destroyVNCDisplay :: VNCDisplayWindow -> IO ()
+> destroyVNCDisplay xWindow = do
+>     freeGC (display xWindow) (pixgc xWindow)
+>     freeGC (display xWindow) (wingc xWindow)
+>     freePixmap (display xWindow) (pixmap xWindow)
+>     sync (display xWindow) False
+>     closeDisplay (display xWindow)
+
+Run the VNC Client: create a diplay window, get the initial framebuffer data,
+refresh the display window in a loop, and destroy the window when finished.
+
+> runVNCClient :: Socket -> Box -> Int -> IO ()
+> runVNCClient sock framebuffer bpp = do
+>     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
+>     let env = Environment { sock        = sock
+>                           , framebuffer = framebuffer
+>                           , xWindow     = xWindow
+>                           , leftOffset  = (x framebuffer)
+>                           , topOffset   = (y framebuffer)
+>                           }
+>     runReaderT (framebufferUpdateRequest 0) env
+>     message:_ <- recvInts sock 1
+>     runReaderT (handleServerMessage message) env
+>     runReaderT vncMainLoop env
+>     destroyVNCDisplay xWindow
 
 This is the main loop of the application.
 
@@ -124,16 +125,15 @@ This is the main loop of the application.
 >     handleServerMessage message
 >     vncMainLoop
 
-\subsection{RFB Functions}
-\subsubsection{Server to Client Messages}
+\subsection{Server to Client Message Handling}
 
 Get a message from the sever, and send it to the right function to handle the
-data that will follow after it. The message types are:
+data that will follow. The message types are:
 \begin{itemize}
   \item 0 - Graphics update
-  \item 1 - get color map data (not implemented)
+  \item 1 - Get color map data (not implemented)
   \item 2 - Beep sound
-  \item 3 - cut text from server
+  \item 3 - Cut text from server
 \end{itemize}
 
 > handleServerMessage :: Int -> VNCClient ()
@@ -146,7 +146,7 @@ data that will follow after it. The message types are:
 > refreshWindow = do
 >     env <- ask
 >     (_:n1:n2:_) <- liftIO $ recvInts (sock env) 3
->     handleRectangleHeader (bytesToInt [n1, n2])
+>     sequence_ $ replicate (bytesToInt [n1, n2]) handleRectangleHeader
 >     swapBuffer
 
 > serverCutText :: VNCClient ()
@@ -159,7 +159,7 @@ data that will follow after it. The message types are:
 >     -- but we will print instead
 >     liftIO $ putStrLn cutText
 
-\subsubsection{Client to Server Messages}
+\subsection{Client to Server Messages}
 
 > setEncodings :: Socket -> RFBFormat -> IO Int
 > setEncodings sock format =
@@ -208,54 +208,13 @@ data that will follow after it. The message types are:
 >                   , 0, 0 ]
 >                   ++ (intToBytes 4 key))  
 
-\subsection {Network Functions and Type Convertions}
-
-> recvFixedLength :: Socket -> Int -> IO B8.ByteString
-> recvFixedLength s l = do
->     x <- recv s l
->     if B8.length x < l
->     then if B8.length x == 0
->         then error "Connection Lost" 
->         else do
->             y <- recvFixedLength s (l - B8.length x)
->             return (B8.append x y)
->     else return x
-
-> bytestringToInts :: B8.ByteString -> [Int]
-> bytestringToInts = map ord . B8.unpack
-
-> intsToBytestring :: [Int] -> B8.ByteString
-> intsToBytestring = B8.pack . map chr
-
-> recvString :: Socket -> Int -> IO [Char]
-> recvString s l = fmap B8.unpack (recvFixedLength s l)
-
-> recvInts :: Socket -> Int -> IO [Int]
-> recvInts s l = fmap bytestringToInts (recvFixedLength s l)
-
-> sendString :: Socket -> String -> IO Int
-> sendString s l = send s (B8.pack l)
-
-> sendInts :: Socket -> [Int] -> IO Int
-> sendInts s l = send s (intsToBytestring l)
-
-> bytesToInt :: [Int] -> Int
-> bytesToInt []  = 0
-> bytesToInt [b] = b 
-> bytesToInt bs  = foldl1' (\ a b -> shiftL a 8 .|. b) bs
-
-> intToBytes :: Int -> Int -> [Int]
-> intToBytes l x = let lsr = \b -> shiftR (b .&. 0xFFFFFFFFFFFFFF00) 8
->                  in reverse . take l . fmap (.&. 0xFF) $ iterate lsr x
-
-
 \subsection{Graphics Functions}
 
-Get the header information for each rectangle to be drawn.
+Get the header information for each rectangle to be drawn and draw the
+rectangle.
 
-> handleRectangleHeader :: Int -> VNCClient ()
-> handleRectangleHeader 0 = return ()
-> handleRectangleHeader n = do
+> handleRectangleHeader :: VNCClient ()
+> handleRectangleHeader = do
 >     env <- ask
 >     (x1:x2:
 >      y1:y2:
@@ -267,9 +226,8 @@ Get the header information for each rectangle to be drawn.
 >                     , y = bytesToInt [y1, y2]
 >                     , w = bytesToInt [w1, w2]
 >                     , h = bytesToInt [h1, h2] }
->     displayRectangle (fromIntegral (bytesToInt [e1, e2, e3, e4]))
+>     displayRectangle (fromIntegral . bytesToInt $ [e1, e2, e3, e4])
 >         (x rect - leftOffset env) (y rect - topOffset env) (w rect) (h rect)
->     handleRectangleHeader (n-1)
 
 Choose which decoding function to use for the rectangle.
 
@@ -284,6 +242,17 @@ Choose which decoding function to use for the rectangle.
 >       decodeFunc  _     = \_ _ _ _ -> return ()
 
 \subsubsection{Image Decoding Functions}
+
+The following encoding types are supported, listed by their numeric identifier:
+\begin{itemize}
+  \item 0 - RAW
+  \item 1 - CopyRect
+  \item 2 - RRE
+\end{itemize}
+The following are partially implemented, but not ready use in the application:
+\begin{itemize}
+  \item (-239) - cursor pseudo-encoding
+\end{itemize}
 
 > decodeRAW :: Int -> Int -> Int -> Int -> VNCClient ()
 > decodeRAW x y w h = do
@@ -309,7 +278,7 @@ Choose which decoding function to use for the rectangle.
 >     s1:s2:s3:s4:_ <- liftIO $ recvInts (sock env) 4
 >     color <- recvColor
 >     drawRect x y w h color
->     drawRRESubRects x y (bytesToInt [s1, s2, s3, s4])
+>     sequence_ . replicate (bytesToInt [s1, s2, s3, s4]) $ drawRRESubRect x y
 
 > pseudoDecodeCursor :: Int -> Int -> Int -> Int -> VNCClient ()
 > pseudoDecodeCursor x y w h = do
@@ -320,11 +289,10 @@ Choose which decoding function to use for the rectangle.
 
 \subsubsection{Supporting Functions for Encoding}
 
-Displays the subractangles for RRE encoding.
+Displays a subrectangle for RRE encoding.
 
-> drawRRESubRects :: Int -> Int -> Int -> VNCClient ()
-> drawRRESubRects _  _  0 = return ()
-> drawRRESubRects x0 y0 n = do
+> drawRRESubRect :: Int -> Int -> VNCClient ()
+> drawRRESubRect x0 y0 = do
 >     env <- ask
 >     color <- recvColor
 >     (x1:x2:
@@ -337,28 +305,6 @@ Displays the subractangles for RRE encoding.
 >                     , w = bytesToInt [w1, w2]
 >                     , h = bytesToInt [h1, h2] }
 >     drawRect (x0+(x rect)) (y0+(y rect)) (w rect) (h rect) color
->     drawRRESubRects x0 y0 (n-1)
-
-Get list of colors.
-
-> recvColorList :: Int -> [VNCClient Int]
-> recvColorList size = replicate size recvColor
-
-Get Bitmask array to describe which pixels in an image are valid.
-
-> recvBitMask :: Socket -> Int -> IO [Bool]
-> recvBitMask _ 0 = return []
-> recvBitMask sock size = do
->     byte:_ <- recvInts sock 1
->     xs <- recvBitMask sock (size-1)
->     return $ ((byte .&. 0x80)>0):
->              ((byte .&. 0x40)>0):
->              ((byte .&. 0x20)>0):
->              ((byte .&. 0x10)>0):
->              ((byte .&. 0x08)>0):
->              ((byte .&. 0x04)>0):
->              ((byte .&. 0x02)>0):
->              ((byte .&. 0x01)>0):xs
 
 Draw pixels based on bitmask data.
 
@@ -382,12 +328,17 @@ Draw pixels based on bitmask data.
 > --                         )
 > --                         positions colors $ bits bitMask
 > --    where
-> --      positions = [(x,y) | y <- [y..], x <- [x..(x+w-1)]]
+> --      positions = [(x,y) || y <- [y..], x <- [x..(x+w-1)]]
 > --      bits bs = if widthBitMask > w
 > --                then (\ (xs, ys) -> xs ++ (bits . drop (widthBitMask - w) $ ys)) $ splitAt w bs
 > --                else bitMask
 
-\subsubsection{Drawing to Screen}
+\subsubsection{Recieving Image Data from Server}
+
+Get a list of colors.
+
+> recvColorList :: Int -> [VNCClient Int]
+> recvColorList size = replicate size recvColor
 
 Get the color to be drawn. Supports various bit per pixel formats. 24 bpp is
 non-standard in the RFB protocol, but we support it because some servers will
@@ -403,6 +354,24 @@ accept it.
 >       recvColor' sock 16 = recvInts sock 2 >>= return . bytesToInt
 >       recvColor' sock 8  = recvInts sock 1 >>= return . bytesToInt
 >       recvColor' _    _  = error "Unsupported bits-per-pixel setting"
+
+Get Bitmask array to describe which pixels in an image are valid.
+
+> recvBitMask :: Socket -> Int -> IO [Bool]
+> recvBitMask _ 0 = return []
+> recvBitMask sock size = do
+>     byte:_ <- recvInts sock 1
+>     xs <- recvBitMask sock (size-1)
+>     return $ ((byte .&. 0x80)>0):
+>              ((byte .&. 0x40)>0):
+>              ((byte .&. 0x20)>0):
+>              ((byte .&. 0x10)>0):
+>              ((byte .&. 0x08)>0):
+>              ((byte .&. 0x04)>0):
+>              ((byte .&. 0x02)>0):
+>              ((byte .&. 0x01)>0):xs
+
+\subsubsection{Drawing to Screen}
 
 Draw an individual pixel to the buffer
 
@@ -424,3 +393,14 @@ Draw a filled rectangle to the buffer
 >     liftIO $ setForeground (display xWin) (pixgc xWin) (fromIntegral color)
 >     liftIO $ fillRectangle (display xWin) (pixmap xWin) (pixgc xWin)
 >         (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
+
+Swap the buffered image to the displayed window. This function allows double
+buffering. This reduces the time it takes to draw an update, and eliminates any
+tearing effects.
+
+> swapBuffer :: VNCClient ()
+> swapBuffer = do
+>     env <- ask
+>     let xWin = xWindow env
+>     liftIO $ copyArea (display xWin) (pixmap xWin) (win xWin) (pixgc xWin)
+>                       0 0 (width xWin) (height xWin) 0 0

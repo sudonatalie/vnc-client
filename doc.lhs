@@ -34,5 +34,6 @@
 %include RFB/GUI.lhs
 %include RFB/Client.lhs
 %include RFB/Security.lhs
+%include RFB/Network.lhs
 
 \end{document}
