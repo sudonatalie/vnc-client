@@ -4,10 +4,13 @@
 >                    setPixelFormat) where
 
 > import RFB.Network
+> import Control.Concurrent (forkIO, threadDelay)
 > import Control.Monad.Reader
 > import Data.Bits ((.|.), (.&.), shiftL, shiftR)
 > import Data.Int (Int32)
+> import Foreign.C.Types (CInt)
 > import Graphics.X11.Xlib
+> import Graphics.X11.Xlib.Extras
 > import Network.Socket (Socket)
 
 > data RFBFormat =  RFBFormat
@@ -55,7 +58,7 @@
 
 \subsection{Main VNC Client functions}
 
-Set up and create and X11 display window.
+Set up and create an X11 display window.
 
 > createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
 > createVNCDisplay bpp x y w h = do
@@ -66,6 +69,8 @@ Set up and create and X11 display window.
 >     rootw <- rootWindow display defaultX
 >     win <- createSimpleWindow display rootw (fromIntegral x) (fromIntegral y)
 >         (fromIntegral w) (fromIntegral h) 0 border background
+>     let eventMask = keyPressMask.|.keyReleaseMask
+>     selectInput display win eventMask
 >     setTextProperty display win "VNC Client" wM_NAME
 >     mapWindow display win
 >     gc <- createGC display win
@@ -82,8 +87,7 @@ Set up and create and X11 display window.
 >                                        , height   = (fromIntegral h)
 >                                        , bpp      = bpp
 >                                        }
->     --let eventMask = keyPressMask.||.keyReleaseMask
->     --selectInput display win eventMask
+>     sync display False
 >     return vncDisplay
 
 Close and destroy the X11 display window. Also, empty structures containing
@@ -102,6 +106,7 @@ refresh the display window in a loop, and destroy the window when finished.
 
 > runVNCClient :: Socket -> Box -> Int -> IO ()
 > runVNCClient sock framebuffer bpp = do
+>     initThreads -- required for X11 threading
 >     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
 >     let env = Environment { sock        = sock
 >                           , framebuffer = framebuffer
@@ -112,6 +117,7 @@ refresh the display window in a loop, and destroy the window when finished.
 >     runReaderT (framebufferUpdateRequest 0) env
 >     message:_ <- recvInts sock 1
 >     runReaderT (handleServerMessage message) env
+>     forkIO $ runReaderT inputHandler env
 >     runReaderT vncMainLoop env
 >     destroyVNCDisplay xWindow
 
@@ -148,6 +154,7 @@ data that will follow. The message types are:
 >     (_:n1:n2:_) <- liftIO $ recvInts (sock env) 3
 >     sequence_ $ replicate (bytesToInt [n1, n2]) handleRectangleHeader
 >     swapBuffer
+>     liftIO $ flush (display . xWindow $ env)
 
 > serverCutText :: VNCClient ()
 > serverCutText = do
@@ -196,17 +203,13 @@ data that will follow. The message types are:
 >                                    ++ intToBytes 2 (w fb)
 >                                    ++ intToBytes 2 (h fb))
 
-> sendKeyEvent :: Socket -> Bool -> Int -> IO Int
-> sendKeyEvent sock True key =
->     sendInts sock ([4 -- message type
->                   , 1
->                   , 0, 0 ]
->                   ++ (intToBytes 4 key))
-> sendKeyEvent sock False key =
->     sendInts sock ([4 -- message type
->                   , 0
->                   , 0, 0 ]
->                   ++ (intToBytes 4 key))  
+> sendKeyEvent :: Socket -> Bool -> Int -> IO ()
+> sendKeyEvent sock keyPos key = let downFlag = if keyPos then 1 else 0
+>                                in sendInts sock ( 4 -- message type
+>                                                  :downFlag
+>                                                  :0:0
+>                                                  :intToBytes 4 key)
+>                                   >> return ()
 
 \subsection{Graphics Functions}
 
@@ -370,6 +373,7 @@ Get Bitmask array to describe which pixels in an image are valid.
 >              ((byte .&. 0x04)>0):
 >              ((byte .&. 0x02)>0):
 >              ((byte .&. 0x01)>0):xs
+> --recvBitmask' w h = (foldl' (:) $ foldl' (:) getBit ):[]
 
 \subsubsection{Drawing to Screen}
 
@@ -404,3 +408,39 @@ tearing effects.
 >     let xWin = xWindow env
 >     liftIO $ copyArea (display xWin) (pixmap xWin) (win xWin) (pixgc xWin)
 >                       0 0 (width xWin) (height xWin) 0 0
+
+\subsection{Input Functions}
+
+> data InputEvent = KeyEv Bool KeySym | Other
+
+> eventList :: VNCDisplayWindow -> [IO InputEvent]
+> eventList xWindow = repeat $ singleEvent
+>   where
+>     singleEvent :: IO InputEvent
+>     singleEvent = do
+>         p <- pending (display xWindow)
+>         if p /= 0
+>            then allocaXEvent f
+>            else threadDelay 100000 >> singleEvent
+>     f e = do
+>         nextEvent (display xWindow) e
+>         ev     <- getEvent e
+>         evType <- get_EventType e
+>         getEventData e ev evType
+>     getEventData :: XEventPtr -> Event -> EventType -> IO InputEvent
+>     getEventData ePtr e eType | eType == keyPress   = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv True  k
+>                               | eType == keyRelease = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv False k
+>     getEventData _ _ _ = return Other
+
+> inputHandler :: VNCClient ()
+> inputHandler = do
+>     env <- ask
+>     let events = eventList (xWindow env)
+>     liftIO . sequence_ . fmap (f (sock env)) $ events
+>   where
+>     f s e = do ev <- e
+>                handleEvent s ev
+
+> handleEvent :: Socket -> InputEvent -> IO ()
+> handleEvent sock (KeyEv keyPos keySym) = sendKeyEvent sock keyPos (fromIntegral keySym)
+> handleEvent _     _                    = return ()
