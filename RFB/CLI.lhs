@@ -5,7 +5,7 @@
 > import Data
 > import RFB.Client
 > import RFB.Network
-> import RFB.Security
+> import RFB.Security (hashVNCPassword)
 > import Control.Exception (bracket_)
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
@@ -70,42 +70,19 @@ Receive security types
 >     securityTypes <- recvInts sock numberOfSecurityTypes
 >     status verbose $ "Server Security Types: " ++ show securityTypes
 
-Choose security type
+Choose security type and submit hashed password.
 
+>     -- TODO: handle incorrect password
 >     if (noAuth)
 >       then do
 >         sendInts sock [1]
 >         return ()
 >       else do
 >         sendInts sock [2]
-
-Reveive 16 byte challenge
-
 >         challenge <- recvInts sock 16
-
-Get password from user
-
 >         password <- getPassword
-
-Hash password with cypher
-
->         let subkeys = getSubkeys password
-
->         let (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
->         let cha1 = concatMap decToBin8 firstHalf
->         let cha2 = concatMap decToBin8 lastHalf
->                 
->         let res1 = desEncryption cha1 subkeys
->         let res2 = desEncryption cha2 subkeys
->         let cyphertext = res1 ++ res2
-
-Send back encrypted challenge
-
->         sendInts sock cyphertext
-
-Receive security result. type: U32.
-
->         msgRes <- recv sock 4
+>         sendInts sock $ hashVNCPassword password challenge
+>         msgRes <- recv sock 4 -- security result. type: U32
 >         return ()
 
 Allow shared desktop
@@ -141,7 +118,7 @@ Get server name
 >     setEncodings sock format
 >     setPixelFormat sock format
 
-Run the VNC Client. This will run the X11 display window and cummunicate back
+Run the VNC Client. This will run the X11 display window and communicate back
 and forth with the server.
 
 >     runVNCClient sock framebuffer bpp
