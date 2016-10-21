@@ -1,6 +1,6 @@
-\section{Security.lhs}
+\section{Client.Security}
 
-> module RFB.Security (hashVNCPassword) where
+> module Client.Security (hashVNCPassword) where
 
 > import Data.Char (ord)
 

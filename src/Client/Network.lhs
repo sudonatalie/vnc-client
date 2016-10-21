@@ -1,6 +1,6 @@
-\section {Network.lhs}
+\section {Client.Network}
 
-> module RFB.Network (bytesToInt, intToBytes, recvInts, recvString, sendInts,
+> module Client.Network (bytesToInt, intToBytes, recvInts, recvString, sendInts,
 >                     sendString) where
 
 > import Network.Socket hiding (send, recv)

@@ -1,22 +1,20 @@
-\section{CLI.lhs}
+\section{Client.GUI}
 
-> module RFB.CLI (RFB.CLI.connect) where
+> module Client.GUI (Client.GUI.connect) where
 
-> import Data
-> import RFB.Client
-> import RFB.Network
-> import RFB.Security (hashVNCPassword)
+> import Client.Network
+> import Client.Security (hashVNCPassword)
+> import Client.Types
+> import Client.Window (runVNCClient, setEncodings, setPixelFormat)
 > import Control.Exception (bracket_)
 > import Network.Socket hiding (send, recv)
 > import Network.Socket.ByteString (send, recv)
 > import System.Exit (exitWith, ExitCode(..))
-> import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout) 
+> import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout)
 
-\subsection{connect function}
-
-> connect :: String -> Options -> IO()
+> connect :: String -> Options -> String -> IO()
 > connect host Options  { optHelp       = _
->                       , optVerbose    = verbose
+>                       , optVerbose    = _
 >                       , optGraphical  = _
 >                       , optNoAuth     = noAuth
 >                       , optPort       = port
@@ -25,7 +23,7 @@
 >                       , optWidth      = width
 >                       , optHeight     = height
 >                       , optBPP        = bpp }
->     = withSocketsDo $ do
+>     password = withSocketsDo $ do
 
 >     let format = RFBFormat
 >           { encodingTypes   = [1, 2, 0] -- in order of priority
@@ -42,8 +40,6 @@
 
 Connect to server via socket
 
->     status verbose $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
-
 >     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
 >     let serverAddr = head addrInfo
 >     sock <- socket (addrFamily serverAddr) Stream defaultProtocol
@@ -53,12 +49,10 @@ Check for VNC server
 
 >     sendInts sock []
 >     msg <- recvString sock 12
->     status verbose $ "Server Protocol Version: " ++ msg
 
 Choose version number
 
 >     let version = "RFB 003.007\n"
->     status verbose $ "Requsted Protocol Version: " ++ version
 >     sendString sock version
 
 Receive number of security types
@@ -68,11 +62,9 @@ Receive number of security types
 Receive security types
 
 >     securityTypes <- recvInts sock numberOfSecurityTypes
->     status verbose $ "Server Security Types: " ++ show securityTypes
 
 Choose security type and submit hashed password.
 
->     -- TODO: handle incorrect password
 >     if (noAuth)
 >       then do
 >         sendInts sock [1]
@@ -80,7 +72,6 @@ Choose security type and submit hashed password.
 >       else do
 >         sendInts sock [2]
 >         challenge <- recvInts sock 16
->         password <- getPassword
 >         sendInts sock $ hashVNCPassword password challenge
 >         msgRes <- recv sock 4 -- security result. type: U32
 >         return ()
@@ -111,10 +102,6 @@ Get server name
 
 >     serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
->     status verbose $ "Server Name: " ++ serverName
->     status verbose $ "Framebuffer: " ++ show framebuffer
->     status verbose $ "Encoding and pixel format: " ++ show format
-
 >     setEncodings sock format
 >     setPixelFormat sock format
 
@@ -127,30 +114,3 @@ Close socket
 
 >     sClose sock
 >     exitWith ExitSuccess
-
-
-\subsection{getPassword function}
-
-> getPassword :: IO String
-> getPassword = do
->   putStr "Input Password: "
->   hFlush stdout
->   pass <- withEcho False getLine
->   putChar '\n'
->   return pass
-
-\subsection{withEcho function}
-
-> withEcho :: Bool -> IO a -> IO a
-> withEcho echo action = do
->   old <- hGetEcho stdin
->   bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
-
-\subsection{status function}
-
-Print message about the current status if verbose option is enabled.
-
-> status :: Bool -> String -> IO ()
-> status verbose msg = if verbose
->                          then putStrLn msg
->                          else return ()

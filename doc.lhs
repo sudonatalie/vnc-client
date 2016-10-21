@@ -1,13 +1,18 @@
 \documentclass[a4paper,12pt]{article}
 
-%include lhs2TeX.fmt
-%include lhs2TeX.sty
+%include polycode.fmt
 
 \usepackage[utf8]{inputenc}
 \usepackage[margin=1in]{geometry}
 \usepackage[parfill]{parskip}
+\usepackage{hyperref}
 
-\title{\textbf{Customisable VNC Viewers}:\\
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+}
+
+\title{\textbf{Haskell VNC Client}:\\
     Source Code Documentation}
 \author{
     Brandon Byskov\\
@@ -27,13 +32,19 @@
 \begin{document}
 
 \maketitle
+\newpage
 
-%include Main.lhs
-%include Data.lhs
-%include RFB/CLI.lhs
-%include RFB/GUI.lhs
-%include RFB/Client.lhs
-%include RFB/Security.lhs
-%include RFB/Network.lhs
+\tableofcontents
+\newpage
+
+%include src/Main.lhs
+%include src/Client/CLI.lhs
+%include src/Client/GUI.lhs
+%include src/Client/Network.lhs
+%include src/Client/Security.lhs
+%include src/Client/Types.lhs
+%include src/Client/Window.lhs
+%include src/Client/Window/Graphics.lhs
+%include src/Client/Window/Input.lhs
 
 \end{document}

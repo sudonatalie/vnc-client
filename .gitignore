@@ -10,6 +10,8 @@ cabal.sandbox.config
 *.tex
 *.log
 *.aux
+*.out
+*.toc
 *.pdf
 *.ptb
 

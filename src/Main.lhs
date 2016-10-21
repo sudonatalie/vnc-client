@@ -1,12 +1,12 @@
-\section{Main.lhs}
+\section{Main}
 
 > import System.Environment (getArgs)
 > import System.Console.GetOpt
 > import Graphics.UI.Gtk
 > import Graphics.UI.Gtk.Glade
-> import Data
-> import RFB.GUI as GUI
-> import RFB.CLI as CLI
+> import Client.Types
+> import Client.GUI as GUI
+> import Client.CLI as CLI
 
 \subsection{Command Line Options}
 
