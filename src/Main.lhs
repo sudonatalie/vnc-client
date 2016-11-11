@@ -3,7 +3,7 @@
 > import System.Environment (getArgs)
 > import System.Console.GetOpt
 > import Graphics.UI.Gtk
-> import Graphics.UI.Gtk.Glade
+> import Graphics.UI.Gtk.Builder
 > import Client.Types
 > import Client.GUI as GUI
 > import Client.CLI as CLI
@@ -135,15 +135,16 @@ Launch the GUI if it is specifically requested, or if the hostname is unspecifie
 >         if (gui || null params)
 >             then do
 >                 initGUI
->                 Just xml <- xmlNew "gui.glade"
->                 window <- xmlGetWidget xml castToWindow "window"
+>                 builder <- builderNew
+>                 builderAddFromFile builder "gui.glade"
+>                 window <- builderGetObject builder castToWindow "window"
 >                 onDestroy window mainQuit
->                 closeButton <- xmlGetWidget xml castToButton "disconnectButton"
+>                 closeButton <- builderGetObject builder castToButton "disconnectButton"
 >                 onClicked closeButton $ do
 >                     widgetDestroy window
->                 entry <- xmlGetWidget xml castToEntry "entry"
->                 passwordBox <- xmlGetWidget xml castToEntry "password"
->                 connectButton <- xmlGetWidget xml castToButton "connectButton"
+>                 entry <- builderGetObject builder castToEntry "entry"
+>                 passwordBox <- builderGetObject builder castToEntry "password"
+>                 connectButton <- builderGetObject builder castToButton "connectButton"
 >                 onClicked connectButton $ do
 >                     host <- get entry entryText
 >                     password <- get passwordBox entryText

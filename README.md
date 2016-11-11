@@ -8,37 +8,31 @@ This is an experimental alpha project which is no longer under active developmen
 
 Installation
 ------------
+This installation guide needs to be tested again for accuracy.
 
 **OS X**:
     
 1. Install [XQuartz](http://xquartz.macosforge.org/landing/).
 2. `LIBRARY_PATH=/opt/X11/lib:$LIBRARY_PATH CPPFLAGS="-I/opt/X11/include" LDFLAGS="-L/opt/X11/lib" cabal install X11`
-3. `cabal install gtk2hs-buildtools`
-4. `brew install gtk+`
-5. `brew install libglade`
-6. `brew tap homebrew/versions`
-7. `brew install gcc49`
-8. `PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig cabal install glade --with-gcc=gcc-4.9`
-9. `cd vnc-client`
-10. `cabal install`
+3. `brew install gtk+`
+4. `brew tap homebrew/versions`
+5. `cd vnc-client`
+6. `stack build`
 
 **Ubuntu**:
 
 1. Install X11.
-2. `sudo cabal install gtk2hs-buildtools --global`
-3. `sudo apt-get install libghc6-zlib-dev`
-4. `sudo apt-get install libgtk2.0-dev`
-5. `sudo apt-get install libgtksourceview2.0-dev`
-8. `sudo apt-get install libglade2-dev`
-9. `sudo cabal install glade --global`
-10. `cd vnc-client`
-11. `sudo cabal install`
+2. `sudo apt-get install libghc6-zlib-dev`
+3. `sudo apt-get install libgtk2.0-dev`
+4. `sudo apt-get install libgtksourceview2.0-dev`
+5. `cd vnc-client`
+6. `stack build`
 
 Usage
 -----
 
-    ~ $ vnc-client --help
-    Usage: vnc-client [OPTION...] host
+    ~ $ stack exec vnc-client --help
+    Usage: stack exec vnc-client [OPTION...] host
       -?         --help           print usage instructions
       -v         --verbose        verbose mode for more information output
       -g         --gui            configure client via graphical UI

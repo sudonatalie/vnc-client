@@ -83,12 +83,12 @@ The following are partially implemented, but not ready use in the application:
 >         (fromIntegral w) (fromIntegral h) (fromIntegral x) (fromIntegral y)
 
 > decodeRRE :: Int -> Int -> Int -> Int -> VNCClient ()
-> decodeRRE x y w h = do
+> decodeRRE x' y' w' h' = do
 >     env <- ask
 >     s1:s2:s3:s4:_ <- liftIO $ recvInts (sock env) 4
 >     color <- recvColor
->     drawRect x y w h color
->     sequence_ . replicate (bytesToInt [s1, s2, s3, s4]) $ drawRRESubRect x y
+>     drawRect x' y' w' h' color
+>     sequence_ . replicate (bytesToInt [s1, s2, s3, s4]) $ drawRRESubRect x' y'
 >   where
 >     -- Displays a subrectangle for RRE encoding.
 >     drawRRESubRect :: Int -> Int -> VNCClient ()
