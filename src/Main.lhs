@@ -42,7 +42,7 @@ Each option has a default value.
 
 The following option descriptions are used for \texttt{--help}.
 
-> header = "Usage: vnc-client [OPTION...] host"
+> header = "Usage: stack exec -- vnc-client [OPTION...] host"
 
 > options :: [OptDescr (Options -> Options)]
 > options =  [ Option ['?'] ["help"]

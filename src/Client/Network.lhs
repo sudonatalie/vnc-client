@@ -3,46 +3,63 @@
 > module Client.Network (bytesToInt, intToBytes, recvInts, recvString, sendInts,
 >                     sendString) where
 
-> import Network.Socket hiding (send, recv)
-> import Network.Socket.ByteString (send, recv)
-> import qualified Data.ByteString.Char8 as B8 (ByteString, append, length,
->                                               pack, unpack)
 > import Data.Bits ((.|.), (.&.), shiftL, shiftR)
+> import qualified Data.ByteString.Char8 as C8 (ByteString, append, length,
+>                                               null, pack, unpack)
+> import qualified Data.ByteString.Lazy  as B8 (ByteString, append, length,
+>                                               null, pack, unpack)
 > import Data.Char (ord, chr)
+> import Data.Int (Int64)
 > import Data.List (foldl1')
+> import Network.Socket (Socket)
+> import qualified Network.Socket.ByteString      as NetChar (send, recv)
+> import qualified Network.Socket.ByteString.Lazy as NetByte (send, recv)
 
 \subsection {Network Functions}
 
 > recvString :: Socket -> Int -> IO [Char]
-> recvString s l = fmap B8.unpack (recvFixedLength s l)
+> recvString s l = fmap C8.unpack $ recvFixedLengthChar s l
 
 > recvInts :: Socket -> Int -> IO [Int]
-> recvInts s l = fmap bytestringToInts (recvFixedLength s l)
+> recvInts s l = fmap bytestringToInts $ recvFixedLengthByte s (fromIntegral l)
 
 > sendString :: Socket -> String -> IO Int
-> sendString s l = send s (B8.pack l)
+> sendString s str = NetChar.send s $ C8.pack str
 
-> sendInts :: Socket -> [Int] -> IO Int
-> sendInts s l = send s (intsToBytestring l)
+> sendInts :: Socket -> [Int] -> IO Int64
+> sendInts s xs = NetByte.send s $ intsToBytestring xs
 
-> recvFixedLength :: Socket -> Int -> IO B8.ByteString
-> recvFixedLength s l = do
->     x <- recv s l
->     if B8.length x < l
->     then if B8.length x == 0
->         then error "Connection Lost" 
->         else do
->             y <- recvFixedLength s (l - B8.length x)
->             return (B8.append x y)
->     else return x
+> recvFixedLengthByte :: Socket -> Int64 -> IO B8.ByteString
+> recvFixedLengthByte s l = do
+>     x <- NetByte.recv s l
+>     let len = B8.length x
+>     if len < l
+>       then if B8.null x
+>              then error "Connection Lost"
+>              else do
+>                y <- recvFixedLengthByte s (l - len)
+>                return $ B8.append x y
+>       else return x
+
+> recvFixedLengthChar :: Socket -> Int -> IO C8.ByteString
+> recvFixedLengthChar s l = do
+>     x <- NetChar.recv s l
+>     let len = C8.length x
+>     if len < l
+>       then if C8.null x
+>              then error "Connection Lost"
+>              else do
+>                y <- recvFixedLengthChar s (l - len)
+>                return $ C8.append x y
+>       else return x
 
 \subsection {Type Conversion Functions}
 
 > bytestringToInts :: B8.ByteString -> [Int]
-> bytestringToInts = map ord . B8.unpack
+> bytestringToInts = map fromIntegral . B8.unpack
 
 > intsToBytestring :: [Int] -> B8.ByteString
-> intsToBytestring = B8.pack . map chr
+> intsToBytestring = B8.pack . map fromIntegral
 
 > bytesToInt :: [Int] -> Int
 > bytesToInt []  = 0

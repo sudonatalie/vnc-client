@@ -2,6 +2,7 @@
 
 > module Client.Window (runVNCClient, setEncodings, setPixelFormat) where
 
+> import Data.Int (Int64)
 > import Client.Network
 > import Client.Types
 > import Client.Window.Graphics (refreshWindow)
@@ -116,14 +117,14 @@ data that will follow. The message types are:
 
 \subsection{Client to Server Messages}
 
-> setEncodings :: Socket -> RFBFormat -> IO Int
+> setEncodings :: Socket -> RFBFormat -> IO Int64
 > setEncodings sock format =
 >     sendInts sock (  [ 2   -- message-type
 >                      , 0]  -- padding
 >                      ++ intToBytes 2 (length (encodingTypes format))
 >                      ++ concat (map (intToBytes 4) (encodingTypes format)))
 
-> setPixelFormat :: Socket -> RFBFormat -> IO Int
+> setPixelFormat :: Socket -> RFBFormat -> IO Int64
 > setPixelFormat sock format =
 >     sendInts sock (  [ 0        -- message-type
 >                      , 0, 0, 0  -- padding
@@ -140,7 +141,7 @@ data that will follow. The message types are:
 >                      , blueShift format
 >                      , 0, 0, 0 ]) -- padding
 
-> framebufferUpdateRequest :: Int -> VNCClient Int
+> framebufferUpdateRequest :: Int -> VNCClient Int64
 > framebufferUpdateRequest incremental = do
 >     env <- ask
 >     let fb = framebuffer env

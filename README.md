@@ -31,8 +31,8 @@ This installation guide needs to be tested again for accuracy.
 Usage
 -----
 
-    ~ $ stack exec vnc-client --help
-    Usage: stack exec vnc-client [OPTION...] host
+    ~ $ stack exec -- vnc-client --help
+    Usage: stack exec -- vnc-client [OPTION...] host
       -?         --help           print usage instructions
       -v         --verbose        verbose mode for more information output
       -g         --gui            configure client via graphical UI
