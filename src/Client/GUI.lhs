@@ -2,10 +2,11 @@
 
 > module Client.GUI (Client.GUI.connect) where
 
+> import Client.Messages (setEncodings, setPixelFormat)
 > import Client.Network
 > import Client.Security (hashVNCPassword)
 > import Client.Types
-> import Client.Window (runVNCClient, setEncodings, setPixelFormat)
+> import Client.Window (runVNCClient)
 > import Control.Exception (bracket_)
 > import Network.Socket (withSocketsDo)
 > import System.Exit (exitWith, ExitCode(..))

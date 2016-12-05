@@ -20,6 +20,7 @@ library
   exposed-modules:
     Client.CLI
     Client.GUI
+    Client.Messages
     Client.Network
     Client.Security
     Client.Types

@@ -1,14 +1,15 @@
 \section{Client.Window}
 
-> module Client.Window (runVNCClient, setEncodings, setPixelFormat) where
+> module Client.Window (runVNCClient) where
 
+> import Client.Messages (framebufferUpdateRequest)
 > import Client.Network
 > import Client.Types
 > import Client.Window.Graphics (refreshWindow)
 > import Client.Window.Input (inputHandler)
 > import Data.Bits ((.|.))
 > import Control.Concurrent (forkIO)
-> import Control.Monad.Trans.Reader (ask, runReaderT)
+> import Control.Monad.Trans.Reader (runReaderT)
 > import Graphics.X11.Xlib
 > import Network.Socket (Socket)
 
@@ -112,40 +113,3 @@ data that will follow. The message types are:
 >     -- we should be copying cutText to the clipboard here
 >     -- but we will print instead
 >     liftIO $ putStrLn cutText
-
-\subsection{Client to Server Messages}
-
-> setEncodings :: RFBFormat -> RFB ()
-> setEncodings format =
->     sendInts $ packInts (2 :: U8)
->                      >> padding 1
->                     <+> ((fromIntegral . length $ encodingTypes format) :: U16)
->                      >> (packIntList $ encodingTypes format)
-
-> setPixelFormat :: RFBFormat -> RFB ()
-> setPixelFormat format =
->     sendInts $ packInts (0 :: U8)
->                      >> padding 3
->                     <+> bitsPerPixel format
->                     <+> depth format
->                     <+> bigEndianFlag format
->                     <+> trueColourFlag format
->                     <+> redMax format
->                     <+> greenMax format
->                     <+> blueMax format
->                     <+> redShift format
->                     <+> greenShift format
->                     <+> blueShift format
->                      >> padding 3
-
-
-> framebufferUpdateRequest :: U8 -> VNCClient ()
-> framebufferUpdateRequest incremental = do
->     env <- ask
->     let fb = framebuffer env
->     runRFB $ sendInts $ packInts (3 :: U8)
->                              <+> incremental
->                              <+> x fb
->                              <+> y fb
->                              <+> w fb
->                              <+> h fb

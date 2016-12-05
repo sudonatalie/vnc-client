@@ -13,12 +13,12 @@
 
 > refreshWindow :: VNCClient ()
 > refreshWindow = do
->     env <- ask
+>     disp <- display . xWindow <$> ask
 >     runRFB $ recvPadding 1
 >     numRectangles :: U16 <- runRFB recvInt
 >     replicateM_ (fromIntegral numRectangles) handleRectangleHeader
 >     swapBuffer
->     liftIO $ X11.flush (display . xWindow $ env)
+>     liftIO $ X11.flush disp
 
 \subsection{Header Functions}
 
@@ -82,7 +82,6 @@ The following are partially implemented, but not ready use in the application:
 >   where
 >     -- Displays a subrectangle for RRE encoding.
 >     drawRRESubRect = do
->         env <- ask
 >         color <- recvColor
 >         x':y':w':h':_ :: [U16] <- runRFB $ recvInts 4
 >         drawRect (x + x') (y + y') w' h' color
@@ -122,8 +121,8 @@ Get the color to be drawn. Supports various bit per pixel formats.
 
 > recvColor :: VNCClient Color
 > recvColor = do
->     env <- ask
->     runRFB $ recvColor' (bpp . xWindow $ env)
+>     bitsPerPixel <- bpp . xWindow <$> ask
+>     runRFB $ recvColor' bitsPerPixel
 >     where
 >       recvColor' 32 = do bytes <- recvFixedLengthByte 4
 >                          let color = (decode $ ByteString.cons' 0 bytes) :: U32
@@ -157,8 +156,7 @@ Draw an individual pixel to the buffer
 
 > displayPixel :: U16 -> U16 -> Color -> VNCClient ()
 > displayPixel x y color = do
->     env <- ask
->     let xWin = xWindow env
+>     xWin <- xWindow  <$> ask
 >     liftIO $ X11.setForeground (display xWin) (pixgc xWin) color
 >     liftIO $ X11.drawPoint (display xWin) (pixmap xWin) (pixgc xWin)
 >         (fromIntegral x) (fromIntegral y)
@@ -168,8 +166,7 @@ Draw a filled rectangle to the buffer
 > drawRect :: U16 -> U16 -> U16 -> U16 -> Color -> VNCClient ()
 > drawRect x y 1 1 color = displayPixel x y color
 > drawRect x y w h color = do
->     env <- ask
->     let xWin = xWindow env
+>     xWin <- xWindow <$> ask
 >     liftIO $ X11.setForeground (display xWin) (pixgc xWin) color
 >     liftIO $ X11.fillRectangle (display xWin) (pixmap xWin) (pixgc xWin)
 >         (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
@@ -180,7 +177,6 @@ tearing effects.
 
 > swapBuffer :: VNCClient ()
 > swapBuffer = do
->     env <- ask
->     let xWin = xWindow env
+>     xWin <- xWindow <$> ask
 >     liftIO $ X11.copyArea (display xWin) (pixmap xWin) (win xWin) (pixgc xWin)
 >                       0 0 (width xWin) (height xWin) 0 0

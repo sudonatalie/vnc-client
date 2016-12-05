@@ -2,10 +2,10 @@
 
 > module Client.Window.Input (inputHandler) where
 
-> import Client.Network
+> import Client.Messages (messageKeyEvent)
 > import Client.Types
 > import Control.Concurrent (threadDelay)
-> import Control.Monad.Trans.Reader
+> import Control.Monad.Trans.Reader (ask)
 > import Graphics.X11.Xlib
 > import Graphics.X11.Xlib.Extras
 > import Network.Socket (Socket)
@@ -33,23 +33,13 @@
 	
 > inputHandler :: VNCClient ()
 > inputHandler = do
->     env <- ask
->     let events = eventList (xWindow env)
+>     xWin <- xWindow <$> ask
+>     let events = eventList xWin
 >     sequence_ . fmap f $ events
 >   where
 >     f e = do ev <- liftIO e
 >              handleEvent ev
 
 > handleEvent :: InputEvent -> VNCClient ()
-> handleEvent (KeyEv keyPos keySym) = runRFB $ sendKeyEvent keyPos (fromIntegral keySym)
+> handleEvent (KeyEv keyPos keySym) = runRFB $ messageKeyEvent keyPos (fromIntegral keySym)
 > handleEvent  _                    = return ()
-
-\subsection{Sending Input to Server}
-
-> sendKeyEvent :: Bool -> U32 -> RFB ()
-> sendKeyEvent keyPos key = let downFlag = if keyPos then 1 else 0
->                           in sendInts $ packInts (4        :: U8)
->                                              <+> (downFlag :: U8)
->                                              <+> (0        :: U16)
->                                              <+> key
->                              >> return ()

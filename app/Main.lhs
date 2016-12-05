@@ -4,7 +4,6 @@
 > import System.Console.GetOpt
 > import Graphics.UI.Gtk
 > import Graphics.UI.Gtk.Builder
-> import Client.Types
 > import Client.GUI as GUI
 > import Client.CLI as CLI
 > import Client.Types
