@@ -37,7 +37,7 @@
 \tableofcontents
 \newpage
 
-%include src/Main.lhs
+%include app/Main.lhs
 %include src/Client/CLI.lhs
 %include src/Client/GUI.lhs
 %include src/Client/Network.lhs
