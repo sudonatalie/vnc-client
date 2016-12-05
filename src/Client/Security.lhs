@@ -2,17 +2,18 @@
 
 > module Client.Security (hashVNCPassword) where
 
+> import Client.Types
 > import Data.Char (ord)
 
-> hashVNCPassword :: String -> [Int] -> [Int]
+> hashVNCPassword :: String -> [U8] -> [U8]
 > hashVNCPassword password challenge =
 >     let subkeys = getSubkeys password
->         (firstHalf, lastHalf) = splitAt (div (length challenge) 2) challenge
+>         (firstHalf, lastHalf) = splitAt (div (length challenge) 2) (fmap fromIntegral challenge)
 >         cha1 = concatMap decToBin8 firstHalf
 >         cha2 = concatMap decToBin8 lastHalf
 >         res1 = desEncryption cha1 subkeys
 >         res2 = desEncryption cha2 subkeys
->     in res1 ++ res2
+>     in fmap fromIntegral $ res1 ++ res2
 
 \subsection{DES Encryption}
 

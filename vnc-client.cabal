@@ -27,12 +27,17 @@ executable vnc-client
     Client.Window.Graphics
     Client.Window.Input
 
-  -- other-extensions:    
+  default-extensions:
+    FlexibleInstances
+    ScopedTypeVariables    
+    TypeSynonymInstances
+
   build-depends:       
       base         >= 4.6
-    , bytestring   >= 0.1
-    , gtk          >= 0.13
-    , mtl          >= 2.2
+    , binary
+    , bytestring
+    , gtk
+    , transformers
     , network      >= 2.4
     , X11          >= 1.6.1.2
   hs-source-dirs:      src

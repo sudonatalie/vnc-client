@@ -5,7 +5,7 @@
 > import Client.Network
 > import Client.Types
 > import Control.Concurrent (threadDelay)
-> import Control.Monad.Reader
+> import Control.Monad.Trans.Reader
 > import Graphics.X11.Xlib
 > import Graphics.X11.Xlib.Extras
 > import Network.Socket (Socket)
@@ -30,26 +30,26 @@
 >     getEventData ePtr e eType | eType == keyPress   = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv True  k
 >                               | eType == keyRelease = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv False k
 >     getEventData _ _ _ = return Other
-
+	
 > inputHandler :: VNCClient ()
 > inputHandler = do
 >     env <- ask
 >     let events = eventList (xWindow env)
->     liftIO . sequence_ . fmap (f (sock env)) $ events
+>     sequence_ . fmap f $ events
 >   where
->     f s e = do ev <- e
->                handleEvent s ev
+>     f e = do ev <- liftIO e
+>              handleEvent ev
 
-> handleEvent :: Socket -> InputEvent -> IO ()
-> handleEvent sock (KeyEv keyPos keySym) = sendKeyEvent sock keyPos (fromIntegral keySym)
-> handleEvent _     _                    = return ()
+> handleEvent :: InputEvent -> VNCClient ()
+> handleEvent (KeyEv keyPos keySym) = runRFB $ sendKeyEvent keyPos (fromIntegral keySym)
+> handleEvent  _                    = return ()
 
 \subsection{Sending Input to Server}
 
-> sendKeyEvent :: Socket -> Bool -> Int -> IO ()
-> sendKeyEvent sock keyPos key = let downFlag = if keyPos then 1 else 0
->                                in sendInts sock ( 4 -- message type
->                                                  :downFlag
->                                                  :0:0
->                                                  :intToBytes 4 key)
->                                   >> return ()
+> sendKeyEvent :: Bool -> U32 -> RFB ()
+> sendKeyEvent keyPos key = let downFlag = if keyPos then 1 else 0
+>                           in sendInts $ packInts (4        :: U8)
+>                                              <+> (downFlag :: U8)
+>                                              <+> (0        :: U16)
+>                                              <+> key
+>                              >> return ()

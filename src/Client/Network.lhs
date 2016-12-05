@@ -1,71 +1,142 @@
 \section {Client.Network}
 
-> module Client.Network (bytesToInt, intToBytes, recvInts, recvString, sendInts,
->                     sendString) where
+> module Client.Network (
+>       RFBInt(..)
+>
+>     , connect
+>     , disconnect
+>
+>     , sendString
+>     , recvString
+>
+>     , sendInt
+>     , sendInts
+>     , padding
+>     , packIntList
+>     , recvInt
+>     , recvInts
+>     , recvPadding
+>
+>     , recvFixedLengthByte
+>     , recvFixedLengthChar
+>
+>     ) where
 
-> import Data.Bits ((.|.), (.&.), shiftL, shiftR)
+> import Client.Types
+> import Control.Monad (replicateM,replicateM_, sequence_)
+> import Control.Monad.Trans.Reader (ask)
 > import qualified Data.ByteString.Char8 as C8 (ByteString, append, length,
 >                                               null, pack, unpack)
 > import qualified Data.ByteString.Lazy  as B8 (ByteString, append, length,
->                                               null, pack, unpack)
-> import Data.Char (ord, chr)
+>                                               null)
 > import Data.Int (Int64)
-> import Data.List (foldl1')
-> import Network.Socket (Socket)
+> import qualified Network.Socket                 as Network
 > import qualified Network.Socket.ByteString      as NetChar (send, recv)
 > import qualified Network.Socket.ByteString.Lazy as NetByte (send, recv)
 
-\subsection {Network Functions}
+> import Data.Binary (Binary, Get, Put, get, put)
+> import Data.Binary.Get (runGet) 
+> import Data.Binary.Put (runPut)
 
-> recvString :: Socket -> Int -> IO [Char]
-> recvString s l = fmap C8.unpack $ recvFixedLengthChar s l
+\textbf{Notes}: The network send functions currently discard the result. We
+could use the result to ensure the data was sent reliably.
 
-> recvInts :: Socket -> Int -> IO [Int]
-> recvInts s l = fmap bytestringToInts $ recvFixedLengthByte s (fromIntegral l)
+\subsection {Network management}
 
-> sendString :: Socket -> String -> IO Int
-> sendString s str = NetChar.send s $ C8.pack str
+> connect :: String -> Int -> IO Network.Socket
+> connect host port = do
+>     serverAddr:_ <- Network.getAddrInfo Nothing (Just host) (Just $ show port)
+>     sock <- Network.socket (Network.addrFamily serverAddr) Network.Stream Network.defaultProtocol
+>     Network.connect sock (Network.addrAddress serverAddr)
+>     return sock
 
-> sendInts :: Socket -> [Int] -> IO Int64
-> sendInts s xs = NetByte.send s $ intsToBytestring xs
+> disconnect :: RFB ()
+> disconnect = ask >>= liftIO . Network.close >>= return
 
-> recvFixedLengthByte :: Socket -> Int64 -> IO B8.ByteString
-> recvFixedLengthByte s l = do
->     x <- NetByte.recv s l
->     let len = B8.length x
->     if len < l
->       then if B8.null x
->              then error "Connection Lost"
->              else do
->                y <- recvFixedLengthByte s (l - len)
->                return $ B8.append x y
->       else return x
+\subsection {String network functions}
 
-> recvFixedLengthChar :: Socket -> Int -> IO C8.ByteString
-> recvFixedLengthChar s l = do
->     x <- NetChar.recv s l
->     let len = C8.length x
->     if len < l
->       then if C8.null x
->              then error "Connection Lost"
->              else do
->                y <- recvFixedLengthChar s (l - len)
->                return $ C8.append x y
->       else return x
+> sendString :: String -> RFB ()
+> sendString str = do s <- ask
+>                     liftIO . NetChar.send s $ C8.pack str
+>                     return ()
 
-\subsection {Type Conversion Functions}
+> recvString :: U32 -> RFB [Char]
+> recvString n = fmap C8.unpack . recvFixedLengthChar $ fromIntegral n
 
-> bytestringToInts :: B8.ByteString -> [Int]
-> bytestringToInts = map fromIntegral . B8.unpack
+\subsection {Integer network functions}
 
-> intsToBytestring :: [Int] -> B8.ByteString
-> intsToBytestring = B8.pack . map fromIntegral
+> sendInt :: RFBInt a =>  a -> RFB ()
+> sendInt a = do s <- ask
+>                liftIO . NetByte.send s . runPut $ packInts a
+>                return ()
 
-> bytesToInt :: [Int] -> Int
-> bytesToInt []  = 0
-> bytesToInt [b] = b 
-> bytesToInt bs  = foldl1' (\ a b -> shiftL a 8 .|. b) bs
+> sendInts ::  Put -> RFB ()
+> sendInts m = do s <- ask
+>                 liftIO . NetByte.send s $ runPut m
+>                 return ()
 
-> intToBytes :: Int -> Int -> [Int]
-> intToBytes l x = let lsr = \b -> shiftR (b .&. 0xFFFFFFFFFFFFFF00) 8
->                  in reverse . take l . fmap (.&. 0xFF) $ iterate lsr x
+> padding :: Int -> Put
+> padding n = replicateM_ n $ put (0 :: U8)
+
+> packIntList :: RFBInt a => [a] -> Put
+> packIntList = sequence_ . fmap packInts
+
+> recvInt :: RFBInt a => RFB a
+> recvInt = unpackInt (\f b -> recvFixedLengthByte b >>= return . runGet f)
+
+> recvInts :: RFBInt a => Int -> RFB [a]
+> recvInts n = unpackInt (\f b -> recvFixedLengthByte ((fromIntegral n)*b) >>= return . runGet (replicateM n f))
+
+> recvPadding :: Int64 -> RFB ()
+> recvPadding n = recvFixedLengthByte n >> return ()
+
+\subsection {Low level network functions}
+
+> recvFixedLengthByte :: Int64 -> RFB B8.ByteString
+> recvFixedLengthByte l = do
+>     s <- ask
+>     x <- liftIO $ NetByte.recv s l
+>     verifyLength x $ B8.length x
+>   where
+>     verifyLength x len
+>       | l == len  = return x
+>       | B8.null x = error "Connection Lost"
+>       | otherwise = do y <- recvFixedLengthByte $ l - len
+>                        return $ B8.append x y
+
+> recvFixedLengthChar :: Int -> RFB C8.ByteString
+> recvFixedLengthChar l = do
+>     s <- ask
+>     x <- liftIO $ NetChar.recv s l
+>     verifyLength x $ C8.length x
+>   where
+>     verifyLength x len
+>       | l == len  = return x
+>       | C8.null x = error "Connection Lost"
+>       | otherwise = do y <- recvFixedLengthChar $ l - len
+>                        return $ C8.append x y
+
+\subsection {RFBInt Typeclass}
+
+> class Binary a => RFBInt a where
+>     packInts :: a -> Put
+>     packInts a = put a
+>
+>     (<+>) :: RFBInt a =>  Put -> a -> Put
+>     (<+>) m a = m >> (packInts a)
+>
+>     unpackInt :: (Get a -> Int64 -> b) -> b
+
+> instance RFBInt S8 where
+>     unpackInt f = f get 1
+> instance RFBInt S16 where
+>     unpackInt f = f get 2
+> instance RFBInt S32 where
+>     unpackInt f = f get 4
+
+> instance RFBInt U8 where
+>     unpackInt f = f get 1
+> instance RFBInt U16 where
+>     unpackInt f = f get 2
+> instance RFBInt U32 where
+>     unpackInt f = f get 4

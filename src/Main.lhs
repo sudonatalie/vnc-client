@@ -7,6 +7,7 @@
 > import Client.Types
 > import Client.GUI as GUI
 > import Client.CLI as CLI
+> import Client.Types
 
 \subsection{Command Line Options}
 
@@ -61,19 +62,19 @@ The following option descriptions are used for \texttt{--help}.
 >                (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")
 >                "port number (default: 5900)"
 >            , Option ['t'] ["top"]
->                (ReqArg (\ t opts -> opts { optTop = read t :: Int }) "TOP")
+>                (ReqArg (\ t opts -> opts { optTop = read t :: U16 }) "TOP")
 >                "top position (default: 0)"
 >            , Option ['l'] ["left"]
->                (ReqArg (\ l opts -> opts { optLeft = read l :: Int }) "LEFT")
+>                (ReqArg (\ l opts -> opts { optLeft = read l :: U16 }) "LEFT")
 >                "left position (default: 0)"
 >            , Option ['w'] ["width"]
->                (ReqArg (\ w opts -> opts { optWidth = Just (read w :: Int) }) "WIDTH")
+>                (ReqArg (\ w opts -> opts { optWidth = Just (read w :: U16) }) "WIDTH")
 >                "width (default: entire framebuffer)"
 >            , Option ['h'] ["height"]
->                (ReqArg (\ h opts -> opts { optHeight = Just (read h :: Int) }) "HEIGHT")
+>                (ReqArg (\ h opts -> opts { optHeight = Just (read h :: U16) }) "HEIGHT")
 >                "height (default: entire framebuffer)"
 >            , Option "b" ["bits-per-pixel"]
->                (ReqArg (\ bpp opts -> opts { optBPP = read bpp :: Int }) "BITSPERPIXEL")
+>                (ReqArg (\ bpp opts -> opts { optBPP = read bpp :: U8 }) "BITSPERPIXEL")
 >                "bits per pixel (default: 32)"
 >            ]
 

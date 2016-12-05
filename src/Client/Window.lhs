@@ -2,14 +2,13 @@
 
 > module Client.Window (runVNCClient, setEncodings, setPixelFormat) where
 
-> import Data.Int (Int64)
 > import Client.Network
 > import Client.Types
 > import Client.Window.Graphics (refreshWindow)
 > import Client.Window.Input (inputHandler)
 > import Data.Bits ((.|.))
 > import Control.Concurrent (forkIO)
-> import Control.Monad.Reader
+> import Control.Monad.Trans.Reader (ask, runReaderT)
 > import Graphics.X11.Xlib
 > import Network.Socket (Socket)
 
@@ -17,7 +16,7 @@
 
 Set up and create an X11 display window.
 
-> createVNCDisplay :: Int -> Int -> Int -> Int -> Int -> IO VNCDisplayWindow
+> createVNCDisplay :: U8 -> U16 -> U16 -> U16 -> U16 -> IO VNCDisplayWindow
 > createVNCDisplay bpp x y w h = do
 >     display <- openDisplay ""
 >     let defaultX   = defaultScreen display
@@ -61,7 +60,7 @@ image data (possibly unnecessary).
 Run the VNC Client: create a diplay window, get the initial framebuffer data,
 refresh the display window in a loop, and destroy the window when finished.
 
-> runVNCClient :: Socket -> Box -> Int -> IO ()
+> runVNCClient :: Socket -> Box -> U8 -> IO ()
 > runVNCClient sock framebuffer bpp = do
 >     initThreads -- required for X11 threading
 >     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
@@ -72,7 +71,7 @@ refresh the display window in a loop, and destroy the window when finished.
 >                           , topOffset   = (y framebuffer)
 >                           }
 >     runReaderT (framebufferUpdateRequest 0) env
->     message:_ <- recvInts sock 1
+>     message :: U8 <- runRFBWithSocket sock $ recvInt
 >     runReaderT (handleServerMessage message) env
 >     forkIO $ runReaderT inputHandler env
 >     runReaderT vncMainLoop env
@@ -82,9 +81,8 @@ This is the main loop of the application.
 
 > vncMainLoop :: VNCClient ()
 > vncMainLoop = do
->     env <- ask
 >     framebufferUpdateRequest 1
->     message:_ <- liftIO $ recvInts (sock env) 1
+>     message :: U8 <- runRFB recvInt
 >     handleServerMessage message
 >     vncMainLoop
 
@@ -99,55 +97,55 @@ data that will follow. The message types are:
   \item 3 - Cut text from server
 \end{itemize}
 
-> handleServerMessage :: Int -> VNCClient ()
+> handleServerMessage :: U8 -> VNCClient ()
 > handleServerMessage 0 = refreshWindow
+> handleServerMessage 1 = error "Server message 'SetColourMapEntries' has not been implemented."
 > handleServerMessage 2 = liftIO $ putStr "\a" -- Beep
 > handleServerMessage 3 = serverCutText
-> handleServerMessage _ = return ()
+> handleServerMessage _ = error "Unsupported server message."
 
 > serverCutText :: VNCClient ()
 > serverCutText = do
->     env <- ask
->     let s = sock env
->     (_:_:_:l1:l2:l3:l4:_) <- liftIO $ recvInts s 7
->     cutText <- liftIO $ recvString s (bytesToInt [l1, l2, l3, l4])
+>     runRFB $ recvPadding 3
+>     len :: U32 <- runRFB recvInt
+>     cutText <- runRFB $ recvString len
 >     -- we should be copying cutText to the clipboard here
 >     -- but we will print instead
 >     liftIO $ putStrLn cutText
 
 \subsection{Client to Server Messages}
 
-> setEncodings :: Socket -> RFBFormat -> IO Int64
-> setEncodings sock format =
->     sendInts sock (  [ 2   -- message-type
->                      , 0]  -- padding
->                      ++ intToBytes 2 (length (encodingTypes format))
->                      ++ concat (map (intToBytes 4) (encodingTypes format)))
+> setEncodings :: RFBFormat -> RFB ()
+> setEncodings format =
+>     sendInts $ packInts (2 :: U8)
+>                      >> padding 1
+>                     <+> ((fromIntegral . length $ encodingTypes format) :: U16)
+>                      >> (packIntList $ encodingTypes format)
 
-> setPixelFormat :: Socket -> RFBFormat -> IO Int64
-> setPixelFormat sock format =
->     sendInts sock (  [ 0        -- message-type
->                      , 0, 0, 0  -- padding
->                      , bitsPerPixel format
->                      , depth format
->                      , bigEndianFlag format
->                      , trueColourFlag format ]
->                      ++ intToBytes 2 (redMax format)
->                      ++ intToBytes 2 (greenMax format)
->                      ++ intToBytes 2 (blueMax format)
->                      ++
->                      [ redShift format
->                      , greenShift format
->                      , blueShift format
->                      , 0, 0, 0 ]) -- padding
+> setPixelFormat :: RFBFormat -> RFB ()
+> setPixelFormat format =
+>     sendInts $ packInts (0 :: U8)
+>                      >> padding 3
+>                     <+> bitsPerPixel format
+>                     <+> depth format
+>                     <+> bigEndianFlag format
+>                     <+> trueColourFlag format
+>                     <+> redMax format
+>                     <+> greenMax format
+>                     <+> blueMax format
+>                     <+> redShift format
+>                     <+> greenShift format
+>                     <+> blueShift format
+>                      >> padding 3
 
-> framebufferUpdateRequest :: Int -> VNCClient Int64
+
+> framebufferUpdateRequest :: U8 -> VNCClient ()
 > framebufferUpdateRequest incremental = do
 >     env <- ask
 >     let fb = framebuffer env
->     liftIO $ sendInts (sock env) ( [ 3  -- message-type
->                                    , incremental]
->                                    ++ intToBytes 2 (x fb)
->                                    ++ intToBytes 2 (y fb)
->                                    ++ intToBytes 2 (w fb)
->                                    ++ intToBytes 2 (h fb))
+>     runRFB $ sendInts $ packInts (3 :: U8)
+>                              <+> incremental
+>                              <+> x fb
+>                              <+> y fb
+>                              <+> w fb
+>                              <+> h fb

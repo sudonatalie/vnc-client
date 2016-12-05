@@ -7,14 +7,13 @@
 > import Client.Types
 > import Client.Window (runVNCClient, setEncodings, setPixelFormat)
 > import Control.Exception (bracket_)
-> import Network.Socket hiding (send, recv)
-> import Network.Socket.ByteString (send, recv)
+> import Network.Socket (withSocketsDo)
 > import System.Exit (exitWith, ExitCode(..))
 > import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout) 
 
 \subsection{connect function}
 
-> connect :: String -> Options -> IO()
+> connect :: String -> Options -> IO ()
 > connect host Options  { optHelp       = _
 >                       , optVerbose    = verbose
 >                       , optGraphical  = _
@@ -28,7 +27,7 @@
 >     = withSocketsDo $ do
 
 >     let format = RFBFormat
->           { encodingTypes   = [1, 2, 0] -- in order of priority
+>           { encodingTypes   = [1,2,0] -- in order of priority
 >           , bitsPerPixel    = bpp
 >           , depth           = 24
 >           , bigEndianFlag   = 0
@@ -44,30 +43,23 @@ Connect to server via socket
 
 >     status verbose $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
 
->     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
->     let serverAddr = head addrInfo
->     sock <- socket (addrFamily serverAddr) Stream defaultProtocol
->     Network.Socket.connect sock (addrAddress serverAddr)
+>     sock <- Client.Network.connect host port
 
 Check for VNC server
 
->     sendInts sock []
->     msg <- recvString sock 12
+>     msg <- runRFBWithSocket sock $ recvString 12
 >     status verbose $ "Server Protocol Version: " ++ msg
 
 Choose version number
 
 >     let version = "RFB 003.007\n"
 >     status verbose $ "Requsted Protocol Version: " ++ version
->     sendString sock version
-
-Receive number of security types
-
->     (numberOfSecurityTypes:_) <- recvInts sock 1
+>     runRFBWithSocket sock $ sendString version
 
 Receive security types
 
->     securityTypes <- recvInts sock numberOfSecurityTypes
+>     numSecurityTypes :: U8 <- runRFBWithSocket sock $ recvInt
+>     securityTypes :: [U8] <- runRFBWithSocket sock $ recvInts (fromIntegral numSecurityTypes)
 >     status verbose $ "Server Security Types: " ++ show securityTypes
 
 Choose security type and submit hashed password.
@@ -75,48 +67,43 @@ Choose security type and submit hashed password.
 >     -- TODO: handle incorrect password
 >     if (noAuth)
 >       then do
->         sendInts sock [1]
+>         runRFBWithSocket sock $ sendInt (1 :: U8)
 >         return ()
 >       else do
->         sendInts sock [2]
->         challenge <- recvInts sock 16
+>         runRFBWithSocket sock $ sendInt (2 :: U8)
+>         challenge :: [U8] <- runRFBWithSocket sock $ recvInts 16
 >         password <- getPassword
->         sendInts sock $ hashVNCPassword password challenge
->         msgRes <- recv sock 4 -- security result. type: U32
+>         runRFBWithSocket sock . sendInts . packIntList $ hashVNCPassword password challenge
+>         securityResult :: U32 <- runRFBWithSocket sock $ recvInt
 >         return ()
 
 Allow shared desktop
 
->     sendInts sock [1]
+>     runRFBWithSocket sock $ sendInt (1 :: U8)
 
 Get server initialisation message
 
->     (w1:w2:
->      h1:h2:
->      _:_:_:_:_:_:_:_:_:_:_:_:_:_:_:_: -- server-pixel-format
->      l1:l2:l3:l4:
->      _) <- recvInts sock 24
+>     w':h':_ :: [U16] <- runRFBWithSocket sock $ recvInts 2
+>     runRFBWithSocket sock $ recvPadding 16 -- server-pixel-format. We should be using this.
+>     nameLength :: U32 <- runRFBWithSocket sock $ recvInt
+>     serverName <- runRFBWithSocket sock $ recvString nameLength
 
 >     let framebuffer = Box  { x = left
 >                            , y = top
 >                            , w = case width of
 >                                      Just w -> w
->                                      Nothing -> bytesToInt [w1, w2] - left
+>                                      Nothing -> w' - left
 >                            , h = case height of
 >                                      Just h -> h
->                                      Nothing -> bytesToInt [h1, h2] - top
+>                                      Nothing -> h' - top
 >                            }
-
-Get server name
-
->     serverName <- recvString sock (bytesToInt [l1, l2, l3, l4])
 
 >     status verbose $ "Server Name: " ++ serverName
 >     status verbose $ "Framebuffer: " ++ show framebuffer
 >     status verbose $ "Encoding and pixel format: " ++ show format
 
->     setEncodings sock format
->     setPixelFormat sock format
+>     runRFBWithSocket sock $ setEncodings format
+>     runRFBWithSocket sock $ setPixelFormat format
 
 Run the VNC Client. This will run the X11 display window and communicate back
 and forth with the server.
@@ -125,7 +112,7 @@ and forth with the server.
 
 Close socket
 
->     sClose sock
+>     runRFBWithSocket sock $ disconnect
 >     exitWith ExitSuccess
 
 
