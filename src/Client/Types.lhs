@@ -1,12 +1,14 @@
 \section{Client.Types}
 
-> module Client.Types
->    ( module Client.Types
+> module Client.Types (
+>      module Client.Types
 >    , module Control.Monad.IO.Class -- export MonadIO typeclass and liftIO
 >    ) where
 
 > import Control.Monad.IO.Class
+> import Control.Monad.Trans.Class
 > import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+> import Control.Monad.Trans.State (StateT, get)
 > import Data.Int (Int8, Int16, Int32)
 > import Data.Word (Word8, Word16, Word32)
 > import Graphics.X11.Xlib (Display, Dimension, Drawable, GC, Pixmap, Window)
@@ -16,7 +18,7 @@
 >                 { optHelp      :: Bool
 >                 , optVerbose   :: Bool
 >                 , optGraphical :: Bool
->                 , optNoAuth    :: Bool
+>                 , optAuth      :: SecurityType
 >                 , optPort      :: Int
 >                 , optTop       :: U16
 >                 , optLeft      :: U16
@@ -38,6 +40,16 @@
 >                   , greenShift      :: U8
 >                   , blueShift       :: U8
 >                   } deriving (Show)
+
+> data Interface = CLI | GUI
+
+\subsection{Handshake Types}
+
+> data RFBVersion = RFB3_3 | RFB3_7 | RFB3_8
+>     deriving (Eq, Ord)
+
+> data SecurityType = NoAuth | VNCAuth
+>     deriving (Show)
 
 \subsection{RFB Network Types}
 
@@ -61,21 +73,62 @@ those used in the RFB spec.
 > type U16 = Word16
 > type U32 = Word32
 
-\subsection{Client Window Types}
+\subsection{Main VNC Client Types}
 
-> type VNCClient = ReaderT Environment IO
+> class MonadIO m => MonadClient m where
+>     liftClient :: VNCClient a -> m a
+>
+>     getClientInfo :: m ClientInfo
+>     getClientInfo = liftClient get
+>
+>     -- Print message about the current status if verbose option is enabled.
+>     status :: String -> m ()
+>     status msg = do v <- verbose <$> getClientInfo
+>                     if v
+>                       then liftIO $ putStrLn msg
+>                       else return ()
+
+> type VNCClient = StateT ClientInfo IO
 
 > instance RFBNetwork VNCClient where
->     runRFB m = do env <- ask
->                   runRFBWithSocket (sock env) m
+>     runRFB m = do s <- sock <$> getClientInfo
+>                   runRFBWithSocket s m
 
-> data Environment = Environment
->                    { sock        :: Socket
->                    , framebuffer :: Box
->                    , xWindow     :: VNCDisplayWindow
->                    , leftOffset  :: U16
->                    , topOffset   :: U16
->                    }
+> instance MonadClient VNCClient where
+>     liftClient = id
+
+> data ClientInfo = ClientInfo
+>                     { sock    :: Socket
+>                     , version :: RFBVersion
+>                     , ui      :: Interface
+>                     , verbose :: Bool
+>                     }
+
+\subsection{VNC Client Window Types}
+
+> class MonadWindow m where
+>     liftWindow :: VNCWindow a -> m a
+>
+>     getWindowInfo :: m WindowInfo
+>     getWindowInfo = liftWindow ask
+
+> type VNCWindow = ReaderT WindowInfo VNCClient
+
+> instance RFBNetwork VNCWindow where
+>     runRFB m = liftClient $ runRFB m
+
+> instance MonadClient VNCWindow where
+>     liftClient = lift
+
+> instance MonadWindow VNCWindow where
+>     liftWindow = id
+
+> data WindowInfo = WindowInfo
+>                     { framebuffer :: Box
+>                     , xWindow     :: VNCDisplayWindow
+>                     , leftOffset  :: U16
+>                     , topOffset   :: U16
+>                     }
 
 > data Box =  Box
 >             { x  :: U16

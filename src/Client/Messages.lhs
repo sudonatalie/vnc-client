@@ -9,7 +9,6 @@
 
 > import Client.Network
 > import Client.Types
-> import Control.Monad.Trans.Reader (ask)
 
 \subsection{Client to Server Messages}
 
@@ -36,9 +35,9 @@
 >                     <+> ((fromIntegral . length $ encodingTypes format) :: U16)
 >                      >> (packIntList $ encodingTypes format)
 
-> framebufferUpdateRequest :: U8 -> VNCClient ()
+> framebufferUpdateRequest :: U8 -> VNCWindow ()
 > framebufferUpdateRequest incremental = do
->     fb <- framebuffer <$> ask
+>     fb <- framebuffer <$> getWindowInfo
 >     runRFB $ sendInts $ packInts (3 :: U8)
 >                              <+> incremental
 >                              <+> x fb
@@ -50,7 +49,7 @@
 > messageKeyEvent keyPos key = let downFlag = if keyPos then 1 else 0
 >                           in sendInts $ packInts (4        :: U8)
 >                                              <+> (downFlag :: U8)
->                                              <+> (0        :: U16)
+>                                               >> padding 2
 >                                              <+> key
 
 > messagePointerEvent = undefined

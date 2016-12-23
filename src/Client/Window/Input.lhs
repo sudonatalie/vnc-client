@@ -5,7 +5,6 @@
 > import Client.Messages (messageKeyEvent)
 > import Client.Types
 > import Control.Concurrent (threadDelay)
-> import Control.Monad.Trans.Reader (ask)
 > import Graphics.X11.Xlib
 > import Graphics.X11.Xlib.Extras
 > import Network.Socket (Socket)
@@ -31,15 +30,15 @@
 >                               | eType == keyRelease = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv False k
 >     getEventData _ _ _ = return Other
 	
-> inputHandler :: VNCClient ()
+> inputHandler :: VNCWindow ()
 > inputHandler = do
->     xWin <- xWindow <$> ask
+>     xWin <- xWindow <$> getWindowInfo
 >     let events = eventList xWin
 >     sequence_ . fmap f $ events
 >   where
 >     f e = do ev <- liftIO e
 >              handleEvent ev
 
-> handleEvent :: InputEvent -> VNCClient ()
+> handleEvent :: InputEvent -> VNCWindow ()
 > handleEvent (KeyEv keyPos keySym) = runRFB $ messageKeyEvent keyPos (fromIntegral keySym)
 > handleEvent  _                    = return ()

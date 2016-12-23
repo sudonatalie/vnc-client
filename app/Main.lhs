@@ -1,12 +1,11 @@
 \section{Main}
 
-> import System.Environment (getArgs)
-> import System.Console.GetOpt
+> import Client (launchVNCClient)
+> import Client.Types
 > import Graphics.UI.Gtk
 > import Graphics.UI.Gtk.Builder
-> import Client.GUI as GUI
-> import Client.CLI as CLI
-> import Client.Types
+> import System.Console.GetOpt
+> import System.Environment (getArgs)
 
 \subsection{Command Line Options}
 
@@ -29,7 +28,7 @@ Each option has a default value.
 >                   { optHelp = False
 >                   , optVerbose = False
 >                   , optGraphical = False
->                   , optNoAuth = False
+>                   , optAuth = VNCAuth
 >                   , optPort = 5900
 >                   , optTop = 0
 >                   , optLeft = 0
@@ -55,7 +54,7 @@ The following option descriptions are used for \texttt{--help}.
 >                (NoArg (\ opts -> opts { optGraphical = True }))
 >                "configure client via graphical UI"
 >            , Option ['n'] ["no-auth"]
->                (NoArg (\ opts -> opts { optNoAuth = True }))
+>                (NoArg (\ opts -> opts { optAuth = NoAuth }))
 >                "connect without authentication (default: VNC password authentication)"
 >            , Option ['p'] ["port"]
 >                (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")
@@ -95,7 +94,7 @@ First, get and parse the command line arguments as options.
 >     (opts@Options  { optHelp       = help
 >                    , optVerbose    = verbose
 >                    , optGraphical  = gui
->                    , optNoAuth     = noAuth
+>                    , optAuth       = auth
 >                    , optPort       = port
 >                    , optTop        = top
 >                    , optLeft       = left
@@ -148,7 +147,7 @@ Launch the GUI if it is specifically requested, or if the hostname is unspecifie
 >                 onClicked connectButton $ do
 >                     host <- get entry entryText
 >                     password <- get passwordBox entryText
->                     GUI.connect host opts password
+>                     launchVNCClient GUI host (Just password) opts
 >                 widgetShowAll window
 >                 mainGUI
 
@@ -158,5 +157,5 @@ Launch the CLI otherwise.
 
 >         else do
 >             case params of
->                 [host]  -> CLI.connect host opts
+>                 [host]  -> launchVNCClient CLI host Nothing opts
 >                 _       -> ioError (userError ("too many arguments\n" ++ usageInfo header options))

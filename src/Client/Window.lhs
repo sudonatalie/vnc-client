@@ -1,6 +1,6 @@
 \section{Client.Window}
 
-> module Client.Window (runVNCClient) where
+> module Client.Window (runVNCWindow) where
 
 > import Client.Messages (framebufferUpdateRequest)
 > import Client.Network
@@ -8,7 +8,7 @@
 > import Client.Window.Graphics (refreshWindow)
 > import Client.Window.Input (inputHandler)
 > import Data.Bits ((.|.))
-> import Control.Concurrent (forkIO)
+> import Control.Concurrent.Lifted (fork)
 > import Control.Monad.Trans.Reader (runReaderT)
 > import Graphics.X11.Xlib
 > import Network.Socket (Socket)
@@ -61,26 +61,25 @@ image data (possibly unnecessary).
 Run the VNC Client: create a diplay window, get the initial framebuffer data,
 refresh the display window in a loop, and destroy the window when finished.
 
-> runVNCClient :: Socket -> Box -> U8 -> IO ()
-> runVNCClient sock framebuffer bpp = do
->     initThreads -- required for X11 threading
->     xWindow <- createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
->     let env = Environment { sock        = sock
->                           , framebuffer = framebuffer
->                           , xWindow     = xWindow
->                           , leftOffset  = (x framebuffer)
->                           , topOffset   = (y framebuffer)
->                           }
+> runVNCWindow :: Box -> U8 -> VNCClient ()
+> runVNCWindow framebuffer bpp = do
+>     liftIO initThreads -- required for X11 threading
+>     xWindow <- liftIO $ createVNCDisplay bpp 0 0 (w framebuffer) (h framebuffer)
+>     let env = WindowInfo { framebuffer = framebuffer
+>                          , xWindow     = xWindow
+>                          , leftOffset  = (x framebuffer)
+>                          , topOffset   = (y framebuffer)
+>                          }
 >     runReaderT (framebufferUpdateRequest 0) env
->     message :: U8 <- runRFBWithSocket sock $ recvInt
+>     message :: U8 <- runRFB recvInt
 >     runReaderT (handleServerMessage message) env
->     forkIO $ runReaderT inputHandler env
+>     fork $ runReaderT inputHandler env
 >     runReaderT vncMainLoop env
->     destroyVNCDisplay xWindow
+>     liftIO $ destroyVNCDisplay xWindow
 
 This is the main loop of the application.
 
-> vncMainLoop :: VNCClient ()
+> vncMainLoop :: VNCWindow ()
 > vncMainLoop = do
 >     framebufferUpdateRequest 1
 >     message :: U8 <- runRFB recvInt
@@ -98,14 +97,14 @@ data that will follow. The message types are:
   \item 3 - Cut text from server
 \end{itemize}
 
-> handleServerMessage :: U8 -> VNCClient ()
+> handleServerMessage :: U8 -> VNCWindow ()
 > handleServerMessage 0 = refreshWindow
 > handleServerMessage 1 = error "Server message 'SetColourMapEntries' has not been implemented."
 > handleServerMessage 2 = liftIO $ putStr "\a" -- Beep
 > handleServerMessage 3 = serverCutText
 > handleServerMessage _ = error "Unsupported server message."
 
-> serverCutText :: VNCClient ()
+> serverCutText :: VNCWindow ()
 > serverCutText = do
 >     runRFB $ recvPadding 3
 >     len :: U32 <- runRFB recvInt

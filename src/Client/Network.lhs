@@ -25,6 +25,9 @@
 > import Client.Types
 > import Control.Monad (replicateM,replicateM_, sequence_)
 > import Control.Monad.Trans.Reader (ask)
+> import Data.Binary (Binary, Get, Put, get, put)
+> import Data.Binary.Get (runGet)
+> import Data.Binary.Put (runPut)
 > import qualified Data.ByteString.Char8 as C8 (ByteString, append, length,
 >                                               null, pack, unpack)
 > import qualified Data.ByteString.Lazy  as B8 (ByteString, append, length,
@@ -33,10 +36,6 @@
 > import qualified Network.Socket                 as Network
 > import qualified Network.Socket.ByteString      as NetChar (send, recv)
 > import qualified Network.Socket.ByteString.Lazy as NetByte (send, recv)
-
-> import Data.Binary (Binary, Get, Put, get, put)
-> import Data.Binary.Get (runGet) 
-> import Data.Binary.Put (runPut)
 
 \textbf{Notes}: The network send functions currently discard the result. We
 could use the result to ensure the data was sent reliably.

@@ -38,8 +38,7 @@
 \newpage
 
 %include app/Main.lhs
-%include src/Client/CLI.lhs
-%include src/Client/GUI.lhs
+%include src/Client.lhs
 %include src/Client/Messages.lhs
 %include src/Client/Network.lhs
 %include src/Client/Security.lhs
