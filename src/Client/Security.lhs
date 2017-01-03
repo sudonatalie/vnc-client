@@ -133,7 +133,7 @@ Second permuted choice
 Permutation: permute xs according to indextable.
 
 > permutation :: [Int] -> [Int] -> [Int]
-> permutation xs [] = []
+> permutation _  [] = []
 > permutation xs (i:indextable)
 >         | i+1 > length xs  = 0 :  permutation xs indextable -- error case
 >         | otherwise        = (xs !! i) : permutation xs indextable

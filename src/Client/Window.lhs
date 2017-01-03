@@ -11,7 +11,6 @@
 > import Control.Concurrent.Lifted (fork)
 > import Control.Monad.Trans.Reader (runReaderT)
 > import Graphics.X11.Xlib
-> import Network.Socket (Socket)
 
 \subsection{Main VNC Client functions}
 

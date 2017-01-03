@@ -23,7 +23,7 @@
 >     ) where
 
 > import Client.Types
-> import Control.Monad (replicateM,replicateM_, sequence_)
+> import Control.Monad (replicateM,replicateM_)
 > import Control.Monad.Trans.Reader (ask)
 > import Data.Binary (Binary, Get, Put, get, put)
 > import Data.Binary.Get (runGet)

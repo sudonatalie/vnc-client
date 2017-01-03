@@ -7,7 +7,6 @@
 > import Control.Concurrent (threadDelay)
 > import Graphics.X11.Xlib
 > import Graphics.X11.Xlib.Extras
-> import Network.Socket (Socket)
 
 > data InputEvent = KeyEv Bool KeySym | Other
 
@@ -26,7 +25,7 @@
 >         evType <- get_EventType e
 >         getEventData e ev evType
 >     getEventData :: XEventPtr -> Event -> EventType -> IO InputEvent
->     getEventData ePtr e eType | eType == keyPress   = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv True  k
+>     getEventData ePtr _ eType | eType == keyPress   = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv True  k
 >                               | eType == keyRelease = lookupKeysym (asKeyEvent ePtr) 0 >>= \k -> return $ KeyEv False k
 >     getEventData _ _ _ = return Other
 	

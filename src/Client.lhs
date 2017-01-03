@@ -8,7 +8,7 @@
 > import Client.Types
 > import Client.Window (runVNCWindow)
 > import Control.Exception (bracket_)
-> import Control.Monad.Trans.State (get, modify, evalStateT)
+> import Control.Monad.Trans.State (modify, evalStateT)
 > import Network.Socket (withSocketsDo)
 > import System.Exit (exitWith, ExitCode(..))
 > import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout) 
@@ -40,7 +40,6 @@
 >                                 }
 >     = do
 >     status $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
->     temp <- get
 >     s <- liftIO $ connect host port
 >     modify $ \a -> a {sock = s}
 
