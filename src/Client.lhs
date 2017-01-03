@@ -104,7 +104,6 @@ Close socket and exit
 
 >     runRFB disconnect
 >     liftIO $ exitWith ExitSuccess
-
 >     return ()
 
 \subsection{Local Functions}

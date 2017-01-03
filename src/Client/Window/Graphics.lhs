@@ -4,7 +4,7 @@
 
 > import Client.Network
 > import Client.Types
-> import Control.Monad (replicateM_)
+> import Control.Monad (liftM, replicateM, replicateM_, when)
 > import Data.Binary (decode)
 > import Data.Bits ((.&.))
 > import Data.ByteString.Lazy as ByteString (cons')
@@ -60,9 +60,7 @@ application:
 > decodeRAW :: U16 -> U16 -> U16 -> U16 -> VNCWindow ()
 > decodeRAW x y w h = do
 >     let colors = recvColorList (fromIntegral w * fromIntegral h)
->     sequence_ $ zipWith (\ (a,b) c -> displayPixel a b =<< c) positions colors
->     where
->       positions = [(x,y) | y <- [y..(y+h-1)], x <- [x..(x+w-1)]]
+>     sequence_ $ zipWith (\ (a,b) c -> displayPixel a b =<< c) (positions x y w h) colors
 
 > decodeCopyRect :: U16 -> U16 -> U16 -> U16 -> VNCWindow ()
 > decodeCopyRect x y w h = do
@@ -88,27 +86,16 @@ application:
 
 > pseudoDecodeCursor :: U16 -> U16 -> U16 -> U16 -> VNCWindow ()
 > pseudoDecodeCursor x y w h = do
->     colors  <- sequence $ recvColorList (fromIntegral w * fromIntegral h)
->     bitMask <- recvBitMask (( (fromIntegral w+7) `div` 8) * fromIntegral h)
->     drawBitmaskedPixels 100 w (((w+7)`div`8)*8) colors bitMask 100 100
+>     colors <- sequence $ recvColorList (fromIntegral w * fromIntegral h)
+>     bitmask <- recvBitmask w h
+>     sequence_ $ zipWith3 (\ (a,b) c bit -> when bit (displayPixel a b c)) (positions x y w h) colors bitmask
 
-\subsubsection{Supporting Functions for Decoding images}
+\subsubsection{Supporting Functions for Decoding Images}
 
-Draw pixels based on bitmask data.
+Generate a list of pixel positions in a rectangular area.
 
-> --needs a rewrite
-> drawBitmaskedPixels :: U16 -> U16 -> U16 -> [Color] -> [Bool] -> U16 -> U16 -> VNCWindow ()
-> drawBitmaskedPixels _  _ _        []        _       _ _ = return ()
-> drawBitmaskedPixels x0 w wBitMask colorList bitMask x y = do
->     if x >= x0 + w
->     then if x >= x0 + wBitMask
->         then drawBitmaskedPixels x0 w wBitMask colorList (bitMask) x0 (y+1)
->         else drawBitmaskedPixels x0 w wBitMask colorList (tail bitMask) (x+1) y
->     else if (head bitMask)
->         then do
->             displayPixel x y (head colorList)
->             drawBitmaskedPixels x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
->         else drawBitmaskedPixels x0 w wBitMask (tail colorList) (tail bitMask) (x+1) y
+> positions :: U16 -> U16 -> U16 -> U16 -> [(U16,U16)]
+> positions x y w h = [(x,y) | y <- [y..(y+h-1)], x <- [x..(x+w-1)]]
 
 \subsection{Recieving Image Data from Server}
 
@@ -134,21 +121,24 @@ Get the color to be drawn. Supports various bit per pixel formats.
 >       recvColor' 8  = (recvInt :: RFB U8)  >>= return . fromIntegral
 >       recvColor' _  = error "Unsupported bits-per-pixel setting"
 
-Get Bitmask array to describe which pixels in an image are valid.
+Get Bitmask array to describe which pixels in an image are valid. This function
+removes the extra bits that are sent as padding.
 
-> recvBitMask :: Int -> VNCWindow [Bool]
-> recvBitMask 0 = return []
-> recvBitMask n = do
->     byte :: U8 <- runRFB recvInt
->     xs <- recvBitMask (n-1)
->     return $ ((byte .&. 0x80)>0):
->              ((byte .&. 0x40)>0):
->              ((byte .&. 0x20)>0):
->              ((byte .&. 0x10)>0):
->              ((byte .&. 0x08)>0):
->              ((byte .&. 0x04)>0):
->              ((byte .&. 0x02)>0):
->              ((byte .&. 0x01)>0):xs
+> recvBitmask :: U16 -> U16 -> VNCWindow [Bool]
+> recvBitmask w h = liftM concat . replicateM (fromIntegral h) $ recvBitRow w
+>   where
+>     recvBitRow :: U16 -> VNCWindow [Bool]
+>     recvBitRow w = do bytes :: [U8] <- runRFB $ recvInts $ ((fromIntegral w)+7)`div`8
+>                       return . take (fromIntegral w) . foldr (\a b -> getBits a b) [] $ bytes
+>     getBits :: U8 -> ([Bool] -> [Bool])
+>     getBits byte xs = ((byte .&. 0x80)>0):
+>                       ((byte .&. 0x40)>0):
+>                       ((byte .&. 0x20)>0):
+>                       ((byte .&. 0x10)>0):
+>                       ((byte .&. 0x08)>0):
+>                       ((byte .&. 0x04)>0):
+>                       ((byte .&. 0x02)>0):
+>                       ((byte .&. 0x01)>0):xs
 
 \subsection{Drawing to Screen}
 
