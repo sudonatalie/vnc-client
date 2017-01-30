@@ -24,8 +24,8 @@
 >                      , verbose = (optVerbose opts)
 >                      }
 
-> -- A new function can be created in the future is process for setting up a GUI
-> -- connection changes.
+> -- A new function can be created in the future if the process for setting up
+> -- a GUI connection diverges from this one.
 > runVNCClient :: String -> Maybe String -> Options -> VNCClient ()
 > runVNCClient host mPwd Options  { optHelp       = _
 >                                 , optVerbose    = _
@@ -42,65 +42,27 @@
 >     status $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
 >     s <- liftIO $ connect host port
 >     modify $ \a -> a {sock = s}
-
-Get Server Protocol Version
-
 >     msg <- runRFB $ recvString 12
 >     status $ "Server Protocol Version: " ++ msg
-
-Choose version number
-
 >     let version = "RFB 003.007\n"
 >     status $ "Requsted Protocol Version: " ++ version
 >     runRFB $ sendString version
-
-Receive security types
-
 >     numSecurityTypes :: U8   <- runRFB recvInt
 >     securityTypes    :: [U8] <- runRFB $ recvInts (fromIntegral numSecurityTypes)
 >     status $ "Server Security Types: " ++ show securityTypes
-
-Choose security type and submit hashed password.
-
 >     authenticateUser authentication mPwd
-
-Allow shared desktop
-
->     runRFB $ sendInt (1 :: U8)
-
-Get server initialisation message
-
->     w':h':_ :: [U16] <- runRFB $ recvInts 2
->     runRFB $ recvPadding 16 -- server-pixel-format. We should be using this.
->     nameLength :: U32 <- runRFB recvInt
->     serverName <- runRFB $ recvString nameLength
-
->     let framebuffer = Box  { x = left
->                            , y = top
->                            , w = case width of
->                                      Just w -> w
->                                      Nothing -> w' - left
->                            , h = case height of
->                                      Just h -> h
->                                      Nothing -> h' - top
->                            }
-
+>     clientInit True
+>     serverInit <- recvServerInit
+>     let framebuffer = verifyFramebuffer (framebufferWidth serverInit) (framebufferHeight serverInit)
+>                         width height left top
 >     let format = defualtFormat {bitsPerPixel = bpp}
-
->     status $ "Server Name: " ++ serverName
+>     status $ "Server Name: " ++ (serverName serverInit)
 >     status $ "Framebuffer: " ++ show framebuffer
->     status $ "Encoding and pixel format: " ++ show format
-
->     runRFB $ setEncodings format
+>     status $ "Encodings: " ++ show supportedEncodingTypes
+>     status $ "Pixel format: " ++ show format
+>     runRFB $ setEncodings supportedEncodingTypes
 >     runRFB $ setPixelFormat format
-
-Run the VNC Client. This will run the X11 display window and communicate back
-and forth with the server.
-
 >     runVNCWindow framebuffer bpp
-
-Close socket and exit
-
 >     runRFB disconnect
 >     liftIO $ exitWith ExitSuccess
 >     return ()
@@ -143,20 +105,51 @@ Close socket and exit
 >       old <- hGetEcho stdin
 >       bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
 
+Initialize connection after handshake is complete. ClientInit True allows shared
+access to the server, ClientInit False requests exclusive access to the server.
+
+> clientInit :: Bool -> VNCClient ()
+> clientInit True = runRFB $ sendInt (1 :: U8)
+> clientInit _    = runRFB $ sendInt (0 :: U8)
+
+> recvServerInit :: VNCClient ServerInitMessage
+> recvServerInit = do
+>     fbWidth:fbHeight:_ :: [U16] <- runRFB $ recvInts 2
+>     runRFB $ recvPadding 16 -- server-pixel-format. We should be using this.
+>     nameLength :: U32 <- runRFB recvInt
+>     serverName <- runRFB $ recvString nameLength
+>     return $ ServerInitMessage fbWidth fbHeight undefined serverName
+
+> verifyFramebuffer :: U16 -> U16 -> Maybe U16 -> Maybe U16 -> U16 -> U16->  Box
+> verifyFramebuffer serverW serverH mWidth mHeight left top
+>   | left >= serverW = error $ "Left offset is greater than server screen width." ++ screenDimensions
+>   | top  >= serverH = error $ "Top offset is greater than server screen height." ++ screenDimensions
+>   | requestedWidth + left > serverW = error $ "The requested screen horzontal area is outside the bounds of the server Screen." ++ screenDimensions
+>   | requestedHeight + top > serverH = error $ "The requested screen vertical area is outside the bounds of the server Screen." ++ screenDimensions
+>   | otherwise = Box left top requestedWidth requestedHeight
+>   where
+>     requestedWidth  = maybe (serverW - left) id mWidth
+>     requestedHeight = maybe (serverH - top)  id mHeight
+>     screenDimensions = "\nServer Width: " ++ show serverW ++ " pixels\nServer Height: " ++ show serverH ++ " pixels"
+
 \subsection{Default Values}
 
 > supportedRFBVersions = [RFB3_7]
 
-> defualtFormat = RFBFormat
->     { encodingTypes   = [1,2,0] -- in order of priority
->     , bitsPerPixel    = 24
->     , depth           = 24
->     , bigEndianFlag   = 0
->     , trueColourFlag  = 1
->     , redMax          = 255
->     , greenMax        = 255
->     , blueMax         = 255
->     , redShift        = 0
->     , greenShift      = 8
->     , blueShift       = 16
+These are the pixel encodings supported in Client.Window.Graphics.
+
+> supportedEncodingTypes :: [S32]
+> supportedEncodingTypes = [1,2,0] -- in order of priority
+
+> defualtFormat = PixelFormat
+>     { bitsPerPixel   = 24
+>     , depth          = 24
+>     , bigEndianFlag  = 0
+>     , trueColourFlag = 1
+>     , redMax         = 255
+>     , greenMax       = 255
+>     , blueMax        = 255
+>     , redShift       = 0
+>     , greenShift     = 8
+>     , blueShift      = 16
 >     }

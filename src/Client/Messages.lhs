@@ -12,7 +12,7 @@
 
 \subsection{Client to Server Messages}
 
-> setPixelFormat :: RFBFormat -> RFB ()
+> setPixelFormat :: PixelFormat -> RFB ()
 > setPixelFormat format =
 >     sendInts $ packInts (0 :: U8)
 >                      >> padding 3
@@ -28,12 +28,12 @@
 >                     <+> blueShift format
 >                      >> padding 3
 
-> setEncodings :: RFBFormat -> RFB ()
-> setEncodings format =
+> setEncodings :: [S32] -> RFB ()
+> setEncodings encodings =
 >     sendInts $ packInts (2 :: U8)
 >                      >> padding 1
->                     <+> ((fromIntegral . length $ encodingTypes format) :: U16)
->                      >> (packIntList $ encodingTypes format)
+>                     <+> ((fromIntegral . length $ encodings) :: U16)
+>                      >> packIntList encodings
 
 > framebufferUpdateRequest :: U8 -> VNCWindow ()
 > framebufferUpdateRequest incremental = do

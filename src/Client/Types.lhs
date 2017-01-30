@@ -27,25 +27,33 @@
 >                 , optBPP       :: U8
 >                 } deriving Show
 
-> data RFBFormat =  RFBFormat
->                   { encodingTypes   :: [S32]
->                   , bitsPerPixel    :: U8
->                   , depth           :: U8
->                   , bigEndianFlag   :: U8
->                   , trueColourFlag  :: U8
->                   , redMax          :: U16
->                   , greenMax        :: U16
->                   , blueMax         :: U16
->                   , redShift        :: U8
->                   , greenShift      :: U8
->                   , blueShift       :: U8
+> data PixelFormat =  PixelFormat
+>                   { bitsPerPixel   :: U8
+>                   , depth          :: U8
+>                   , bigEndianFlag  :: U8
+>                   , trueColourFlag :: U8
+>                   , redMax         :: U16
+>                   , greenMax       :: U16
+>                   , blueMax        :: U16
+>                   , redShift       :: U8
+>                   , greenShift     :: U8
+>                   , blueShift      :: U8
 >                   } deriving (Show)
+
+\subsection{Client Types}
 
 > data Interface = CLI | GUI
 
+> data ServerInitMessage =  ServerInitMessage
+>                           { framebufferWidth  :: U16
+>                           , framebufferHeight :: U16
+>                           , serverPixelFormat :: PixelFormat
+>                           , serverName        :: String
+>                           }
+
 \subsection{Handshake Types}
 
-> data RFBVersion = RFB3_3 | RFB3_7 | RFB3_8
+> data RFBVersion = RFBInvalid | RFBNonStandardLower | RFB3_3 | RFB3_7 | RFB3_8 | RFBNonStandardHigher
 >     deriving (Eq, Ord)
 
 > data SecurityType = NoAuth | VNCAuth
