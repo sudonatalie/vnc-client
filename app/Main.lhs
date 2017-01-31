@@ -28,7 +28,7 @@ Each option has a default value.
 >                   { optHelp = False
 >                   , optVerbose = False
 >                   , optGraphical = False
->                   , optAuth = VNCAuth
+>                   , optAuth = 2
 >                   , optPort = 5900
 >                   , optTop = 0
 >                   , optLeft = 0
@@ -54,7 +54,7 @@ The following option descriptions are used for \texttt{--help}.
 >                (NoArg (\ opts -> opts { optGraphical = True }))
 >                "configure client via graphical UI"
 >            , Option ['n'] ["no-auth"]
->                (NoArg (\ opts -> opts { optAuth = NoAuth }))
+>                (NoArg (\ opts -> opts { optAuth = 1 }))
 >                "connect without authentication (default: VNC password authentication)"
 >            , Option ['p'] ["port"]
 >                (ReqArg (\ p opts -> opts { optPort = read p :: Int }) "PORT")

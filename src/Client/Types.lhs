@@ -18,7 +18,7 @@
 >                 { optHelp      :: Bool
 >                 , optVerbose   :: Bool
 >                 , optGraphical :: Bool
->                 , optAuth      :: SecurityType
+>                 , optAuth      :: U8
 >                 , optPort      :: Int
 >                 , optTop       :: U16
 >                 , optLeft      :: U16
@@ -55,9 +55,6 @@
 
 > data RFBVersion = RFBInvalid | RFBNonStandardLower | RFB3_3 | RFB3_7 | RFB3_8 | RFBNonStandardHigher
 >     deriving (Eq, Ord)
-
-> data SecurityType = NoAuth | VNCAuth
->     deriving (Show)
 
 \subsection{RFB Network Types}
 

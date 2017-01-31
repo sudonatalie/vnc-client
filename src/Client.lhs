@@ -49,7 +49,7 @@
 >     let format = defualtFormat {bitsPerPixel = bpp}
 >     status $ "Server Name: " ++ (serverName serverInit)
 >     status $ "Framebuffer: " ++ show framebuffer
->     status $ "Encodings: " ++ show supportedEncodingTypes
+>     status $ "Encodings supported by client: " ++ show supportedEncodingTypes
 >     status $ "Pixel format: " ++ show format
 >     runRFB $ setEncodings supportedEncodingTypes
 >     runRFB $ setPixelFormat format
