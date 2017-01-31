@@ -19,6 +19,7 @@ library
   hs-source-dirs:      src
   exposed-modules:
     Client
+    Client.Handshake
     Client.Messages
     Client.Network
     Client.Security

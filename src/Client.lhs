@@ -2,16 +2,14 @@
 
 > module Client (launchVNCClient) where
 
+> import Client.Handshake (negotiateProtocolVersion, negotiateSecurity)
 > import Client.Messages (setEncodings, setPixelFormat)
 > import Client.Network
-> import Client.Security (hashVNCPassword)
 > import Client.Types
 > import Client.Window (runVNCWindow)
-> import Control.Exception (bracket_)
 > import Control.Monad.Trans.State (modify, evalStateT)
 > import Network.Socket (withSocketsDo)
 > import System.Exit (exitWith, ExitCode(..))
-> import System.IO (hGetEcho, hFlush, hSetEcho, stdin, stdout) 
 
 \subsection{Running VNC Client}
 
@@ -42,15 +40,8 @@
 >     status $ "Connecting to " ++ host ++ ":" ++ show port ++ "..."
 >     s <- liftIO $ connect host port
 >     modify $ \a -> a {sock = s}
->     msg <- runRFB $ recvString 12
->     status $ "Server Protocol Version: " ++ msg
->     let version = "RFB 003.007\n"
->     status $ "Requsted Protocol Version: " ++ version
->     runRFB $ sendString version
->     numSecurityTypes :: U8   <- runRFB recvInt
->     securityTypes    :: [U8] <- runRFB $ recvInts (fromIntegral numSecurityTypes)
->     status $ "Server Security Types: " ++ show securityTypes
->     authenticateUser authentication mPwd
+>     negotiateProtocolVersion supportedRFBVersions
+>     negotiateSecurity authentication mPwd
 >     clientInit True
 >     serverInit <- recvServerInit
 >     let framebuffer = verifyFramebuffer (framebufferWidth serverInit) (framebufferHeight serverInit)
@@ -68,42 +59,6 @@
 >     return ()
 
 \subsection{Local Functions}
-
-> authenticateUser :: SecurityType -> Maybe String -> VNCClient U32
-> authenticateUser secType Nothing = do 
->     interface <- ui <$> getClientInfo
->     case interface of
->       CLI -> do password <- liftIO getPassword
->                 result <- authenticateUser' secType password
->                 case result of
->                   0 -> return 0
->                   1 -> liftIO (putStrLn "Invalid Password.") >> authenticateUser secType Nothing
->                   2 -> error "Authenication failed: too many password attempts."
->                   _ -> error "Malformed security result."
->       GUI -> error "no password supplied"
-> authenticateUser secType (Just password) = authenticateUser' secType password
-
-> authenticateUser' :: SecurityType -> String -> VNCClient U32
-> authenticateUser' NoAuth _ = runRFB $ sendInt (1 :: U8) >> return 0
-> authenticateUser' VNCAuth password = do
->     runRFB $ sendInt (2 :: U8)
->     challenge :: [U8] <- runRFB $ recvInts 16
->     runRFB $ sendInts . packIntList $ hashVNCPassword password challenge
->     securityResult :: U32 <- runRFB recvInt
->     return securityResult
-
-> getPassword :: IO String
-> getPassword = do
->     putStr "Input Password: "
->     hFlush stdout
->     pass <- withEcho False getLine
->     putChar '\n'
->     return pass
->   where
->     withEcho :: Bool -> IO a -> IO a
->     withEcho echo action = do
->       old <- hGetEcho stdin
->       bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
 
 Initialize connection after handshake is complete. ClientInit True allows shared
 access to the server, ClientInit False requests exclusive access to the server.

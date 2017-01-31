@@ -39,6 +39,7 @@
 
 %include app/Main.lhs
 %include src/Client.lhs
+%include src/Client/Handshake.lhs
 %include src/Client/Messages.lhs
 %include src/Client/Network.lhs
 %include src/Client/Security.lhs
