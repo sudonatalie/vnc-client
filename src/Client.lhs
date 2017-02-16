@@ -16,7 +16,7 @@
 > launchVNCClient :: Interface -> String -> Maybe String -> Options -> IO ()
 > launchVNCClient interface host mPwd opts
 >     =  withSocketsDo $ evalStateT (runVNCClient host mPwd opts)
->           ClientInfo { sock    = undefined
+>           ClientInfo { sock    = error "Attempting to access socket. Socket connection not yet established."
 >                      , version = RFB3_7
 >                      , ui      = interface
 >                      , verbose = (optVerbose opts)

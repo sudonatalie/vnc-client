@@ -80,11 +80,11 @@ could use the result to ensure the data was sent reliably.
 > packIntList :: RFBInt a => [a] -> Put
 > packIntList = sequence_ . fmap packInts
 
-> recvInt :: RFBInt a => RFB a
-> recvInt = unpackInt (\f b -> recvFixedLengthByte b >>= return . runGet f)
+> recvInt :: forall a. (RFBInt a) => RFB a
+> recvInt = recvFixedLengthByte (fromIntegral (intWidth :: a)) >>= return . runGet get
 
-> recvInts :: RFBInt a => Int -> RFB [a]
-> recvInts n = unpackInt (\f b -> recvFixedLengthByte ((fromIntegral n)*b) >>= return . runGet (replicateM n f))
+> recvInts :: forall a. RFBInt a => Int -> RFB [a]
+> recvInts n = recvFixedLengthByte (fromIntegral n * fromIntegral (intWidth :: a)) >>= return . runGet (replicateM n get)
 
 > recvPadding :: Int64 -> RFB ()
 > recvPadding n = recvFixedLengthByte n >> return ()
@@ -117,25 +117,25 @@ could use the result to ensure the data was sent reliably.
 
 \subsection {RFBInt Typeclass}
 
-> class Binary a => RFBInt a where
+> class (Integral a, Binary a) => RFBInt a where
 >     packInts :: a -> Put
 >     packInts a = put a
 >
 >     (<+>) :: RFBInt a =>  Put -> a -> Put
 >     (<+>) m a = m >> (packInts a)
 >
->     unpackInt :: (Get a -> Int64 -> b) -> b
+>     intWidth :: a
 
 > instance RFBInt S8 where
->     unpackInt f = f get 1
+>     intWidth = 1
 > instance RFBInt S16 where
->     unpackInt f = f get 2
+>     intWidth = 2
 > instance RFBInt S32 where
->     unpackInt f = f get 4
+>     intWidth = 4
 
 > instance RFBInt U8 where
->     unpackInt f = f get 1
+>     intWidth = 1
 > instance RFBInt U16 where
->     unpackInt f = f get 2
+>     intWidth = 2
 > instance RFBInt U32 where
->     unpackInt f = f get 4
+>     intWidth = 4
